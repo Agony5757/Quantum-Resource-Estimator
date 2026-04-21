@@ -58,7 +58,7 @@ html_theme = 'furo'
 html_theme_options = {
     'sidebar_hide_name': False,
     'navigation_with_keys': True,
-    'source_repository': 'https://github.com/Agony5757/Quantum-Resource-Estimator',
+    'source_repository': 'https://github.com/IAI-USTC-Quantum/Quantum-Resource-Estimator',
     'source_branch': 'main',
     'source_directory': 'docs/source',
     'light_css_variables': {
@@ -71,7 +71,7 @@ html_theme_options = {
 
 html_context = {
     'display_github': True,
-    'github_user': 'Agony5757',
+    'github_user': 'IAI-USTC-Quantum',
     'github_repo': 'Quantum-Resource-Estimator',
     'github_version': 'main',
     'conf_py_path': '/docs/source/',
