@@ -1,0 +1,49 @@
+# Generic Quantum Walk Operator
+# Quantum walk search with amplitude amplification
+
+name: QuantumWalkSearch
+description: "Generic quantum walk search with amplitude amplification"
+qregs:
+  - {name: reg, type: General, desc: "Working register"}
+params:
+  - {name: n_steps, type: int, desc: "Number of walk steps"}
+impl:
+  # Initialize
+  - op: Hadamard
+    qregs:
+      - reg
+
+  # Walk iterations
+  - comment: "Quantum walk iterations (oracle omitted for generic template)"
+    loop:
+      iterations: n_steps
+      body:
+        # Placeholder oracle (requires custom implementation)
+        - op: Init_Unsafe
+          qregs:
+            - reg
+          params: [0]
+
+        # Reflection operator
+        - op: Hadamard
+          qregs:
+            - reg
+
+        - op: X
+          qregs:
+            - reg
+
+        - op: PhaseGate
+          qregs:
+            - reg
+          params: [3.14159265, 0.01]
+
+        - op: X
+          qregs:
+            - reg
+
+        - op: Hadamard
+          qregs:
+            - reg
+
+sum_t_count_formula: custom

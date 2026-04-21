@@ -1,0 +1,63 @@
+# Quantum Binary Search algorithm
+# Simplified version - full implementation would need more complex register handling
+# Searches for a target value in a sorted array stored in QRAM
+
+name: QuantumBinarySearch
+description: "Quantum binary search using QRAM for database lookup"
+qregs:
+  - {name: address_offset, type: UnsignedInteger}
+  - {name: target, type: UnsignedInteger}
+  - {name: result, type: UnsignedInteger}
+params:
+  - {name: total_length, type: int}
+  - {name: max_step, type: int}
+temp_regs:
+  - {name: flag, size: 1}
+  - {name: left_register, size: 10}
+  - {name: right_register, size: 10}
+  - {name: mid_register, size: 10}
+  - {name: midval_register, size: 10}
+  - {name: compare_less, size: 1}
+  - {name: compare_equal, size: 1}
+computed_params:
+  - name: addr_size
+    formula: "total_length.bit_length()"
+impl:
+  # Initialize flag qubit
+  - op: X
+    qregs: [flag]
+
+  # Initialize left and right registers
+  - op: Assign
+    qregs: [address_offset, left_register]
+
+  # Set right = total_length (using Add_ConstUInt)
+  - op: Add_ConstUInt
+    qregs: [left_register]
+    params: [total_length]
+
+  # Binary search iterations
+  - comment: "Binary search loop"
+    loop:
+      iterations: max_step
+      body:
+        # Compute mid
+        - op: GetMid_UInt_UInt
+          qregs: [left_register, right_register, mid_register]
+
+        # Load from QRAM
+        - op: QRAM
+          qregs: [mid_register, midval_register]
+          params: [0]
+
+        # Compare with target
+        - op: Compare_UInt_UInt
+          qregs: [midval_register, target, compare_less, compare_equal]
+
+        # Copy mid to result if found
+        - op: Assign
+          qregs: [mid_register, result]
+
+  # Final cleanup
+  - op: X
+    qregs: [flag]

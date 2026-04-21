@@ -1,0 +1,9 @@
+pyqres.egg-info/
+build/
+__pycache__/
+*.tex
+/pdf_outputs
+/convective_flux_jacobian
+
+# Sphinx documentation build
+docs/build/

@@ -1,0 +1,9 @@
+# Toffoli-based gate set
+# Uses Toffoli as the primary multi-qubit gate
+
+name: toffoli
+description: "Toffoli-based gate set - uses Toffoli as primary multi-qubit gate"
+primitives:
+  - Toffoli
+  - Hadamard
+  - T

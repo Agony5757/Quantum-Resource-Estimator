@@ -1,0 +1,60 @@
+# Shor's Quantum Factorization Algorithm
+# Semi-classical version with iterative phase estimation
+# Time complexity: O(poly(log N)) - exponential speedup over classical
+
+name: ShorFactor
+description: "Shor's quantum factorization algorithm (semi-classical version)"
+qregs:
+  - {name: anc_reg, type: UnsignedInteger, desc: "Ancilla register for modular arithmetic"}
+  - {name: work_reg, type: General, desc: "Work register for phase estimation"}
+params:
+  - {name: N, type: int, desc: "Integer to factor"}
+  - {name: a, type: int, desc: "Random base coprime to N"}
+computed_params:
+  - name: n_qubits
+    formula: "int(math.log2(N)) + 1"
+  - name: precision
+    formula: "self.n_qubits * 2"
+temp_regs:
+  - {name: measure_reg, size: 1}
+impl:
+  # Initialize ancilla register to |1⟩
+  - comment: "Initialize ancilla to |1⟩"
+    op: X
+    qregs:
+      - anc_reg
+
+  # Iterative phase estimation
+  - comment: "Iterative phase estimation"
+    loop:
+      iterations: precision
+      body:
+        # Add work qubit with Hadamard
+        - op: Hadamard
+          qregs:
+            - work_reg
+
+        # Controlled modular multiplication (placeholder)
+        - comment: "Modular multiplication (requires CustomArithmetic)"
+          op: Init_Unsafe
+          qregs:
+            - work_reg
+          params: [0]
+          controllers:
+            all_ones:
+              - anc_reg
+
+        # Phase correction from previous measurements
+        - comment: "Phase correction (simplified)"
+          op: PhaseGate
+          qregs:
+            - work_reg
+          params: [1.570796, 0.01]
+
+        # Measure work qubit (simplified - just flip)
+        - comment: "Measurement (simplified)"
+          op: X
+          qregs:
+            - work_reg
+
+sum_t_count_formula: custom

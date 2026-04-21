@@ -1,0 +1,58 @@
+# Grover Search Algorithm
+# Quantum search using amplitude amplification
+# Iterates Oracle + Diffusion O(sqrt(N)) times
+
+name: GroverSearch
+description: "Grover search with oracle and diffusion operator"
+qregs:
+  - {name: addr_reg, type: UnsignedInteger}
+  - {name: data_reg, type: UnsignedInteger}
+  - {name: search_data_reg, type: UnsignedInteger}
+params:
+  - {name: n_qubits, type: int}
+  - {name: n_repeats, type: int}
+temp_regs:
+  - {name: flag, size: 1}
+computed_params:
+  - name: addr_size
+    formula: "n_qubits"
+impl:
+  # Initialize with Hadamard on address register
+  - op: Hadamard_NDigits
+    qregs: [addr_reg]
+    params: [n_qubits]
+
+  # Grover iteration (repeat n_repeats times)
+  - comment: "Oracle application - QRAM-based oracle marks target"
+    loop:
+      iterations: n_repeats
+      body:
+        # Grover Oracle: flip phase of target state using QRAM
+        - op: QRAM
+          qregs: [addr_reg, data_reg]
+          params: [0]
+
+        # HPH Diffusion operator
+        - op: Hadamard_NDigits
+          qregs: [addr_reg]
+          params: [n_qubits]
+
+        # Phase flip on |0...0>
+        - op: X
+          qregs: [addr_reg]
+
+        - op: CNOT
+          qregs: [addr_reg, flag]
+
+        - op: X
+          qregs: [addr_reg]
+
+        - op: Hadamard_NDigits
+          qregs: [addr_reg]
+          params: [n_qubits]
+
+        # Uncompute QRAM
+        - op: QRAM
+          qregs: [addr_reg, data_reg]
+          params: [0]
+          dagger: true

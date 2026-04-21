@@ -1,0 +1,23 @@
+# Oracle operations library
+# Common oracle patterns for quantum algorithms
+
+- name: PhaseOracle
+  description: "Apply a phase oracle that marks target states with -1 phase"
+  qregs:
+    - {name: data_reg, type: General}
+    - {name: flag_reg, type: Boolean}
+  params:
+    - {name: target_value, type: int}
+  impl:
+    - op: X
+      qregs: [flag_reg]
+      controllers:
+        value: [[data_reg, target_value]]
+    - op: PhaseGate
+      qregs: [flag_reg]
+      params: [3.14159265, 0.001]  # pi phase
+    - op: X
+      qregs: [flag_reg]
+      controllers:
+        value: [[data_reg, target_value]]
+  self_conjugate: true

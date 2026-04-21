@@ -1,0 +1,276 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/composite.schema.json",
+  "title": "Composite Operation",
+  "description": "Schema for Quantum-Resource-Estimator composite operation definitions",
+  "type": "object",
+  "required": ["name", "impl"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Z][a-zA-Z0-9]*$",
+      "description": "Operation class name (PascalCase)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the operation"
+    },
+    "qregs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/register"
+      },
+      "description": "Quantum register declarations"
+    },
+    "params": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/parameter"
+      },
+      "description": "Classical parameter declarations"
+    },
+    "temp_regs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/temp_register"
+      },
+      "description": "Temporary register declarations"
+    },
+    "computed_params": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/computed_param"
+      },
+      "description": "Parameters computed from other params"
+    },
+    "impl": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/impl_item"
+      },
+      "minItems": 1,
+      "description": "Implementation as a list of operation calls"
+    },
+    "self_conjugate": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether U† = U (operation is its own inverse)"
+    },
+    "control_override": {
+      "type": "string",
+      "description": "Special controller propagation pattern (e.g., 'cnot_swap')"
+    },
+    "sum_t_count_formula": {
+      "type": "string",
+      "description": "Set to 'custom' for AbstractComposite with custom sum_t_count"
+    }
+  },
+  "definitions": {
+    "register": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Register name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["General", "UnsignedInteger", "SignedInteger", "Boolean", "Rational"],
+          "description": "Register type for PySparQ compatibility"
+        }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["name", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Parameter name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["int", "float", "symbol", "array", "object", "str", "bool"],
+          "description": "Parameter type"
+        }
+      }
+    },
+    "temp_register": {
+      "type": "object",
+      "required": ["name", "size"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Temporary register name"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of qubits"
+        }
+      }
+    },
+    "computed_param": {
+      "type": "object",
+      "required": ["name", "formula"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Computed parameter name"
+        },
+        "formula": {
+          "type": "string",
+          "description": "Python expression to compute the value"
+        }
+      }
+    },
+    "impl_item": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "type": "string",
+          "description": "Operation name to invoke"
+        },
+        "qregs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Register references"
+        },
+        "params": {
+          "type": "array",
+          "description": "Parameter values"
+        },
+        "dagger": {
+          "type": "boolean",
+          "description": "Apply dagger (inverse)"
+        },
+        "controllers": {
+          "type": "object",
+          "properties": {
+            "all_ones": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "nonzero": {
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "bit": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": [
+                  {"type": "string"},
+                  {"type": "integer"}
+                ],
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "value": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        "comment": {
+          "type": "string",
+          "description": "Inline comment"
+        },
+        "loop": {
+          "$ref": "#/definitions/loop_def"
+        },
+        "loop_reverse": {
+          "$ref": "#/definitions/loop_def"
+        },
+        "for_each": {
+          "$ref": "#/definitions/for_each_def"
+        },
+        "if": {
+          "$ref": "#/definitions/if_def"
+        },
+        "python": {
+          "type": "string",
+          "description": "Inline Python code block"
+        }
+      }
+    },
+    "loop_def": {
+      "type": "object",
+      "required": ["iterations", "body"],
+      "properties": {
+        "iterations": {
+          "description": "Number of iterations (int or param reference)"
+        },
+        "body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/impl_item"
+          }
+        }
+      }
+    },
+    "for_each_def": {
+      "type": "object",
+      "required": ["var", "items", "body"],
+      "properties": {
+        "var": {
+          "type": "string",
+          "description": "Loop variable name"
+        },
+        "items": {
+          "description": "List of items or parameter reference"
+        },
+        "body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/impl_item"
+          }
+        }
+      }
+    },
+    "if_def": {
+      "type": "object",
+      "required": ["condition", "body"],
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Python boolean expression"
+        },
+        "body": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/impl_item"
+          }
+        },
+        "elif": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["condition", "body"],
+            "properties": {
+              "condition": {"type": "string"},
+              "body": {
+                "type": "array",
+                "items": {"$ref": "#/definitions/impl_item"}
+              }
+            }
+          }
+        },
+        "else": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/impl_item"
+          }
+        }
+      }
+    }
+  }
+}

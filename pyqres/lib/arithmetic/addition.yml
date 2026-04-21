@@ -1,0 +1,34 @@
+# Arithmetic operations library
+# Common arithmetic operations for quantum computing
+
+- name: Increment
+  description: "Increment an n-bit register by 1"
+  qregs:
+    - {name: reg, type: UnsignedInteger}
+  params:
+    - {name: n_bits, type: int}
+  impl:
+    - loop:
+        iterations: n_bits
+        body:
+          - op: X
+            qregs: [reg]
+            controllers:
+              all_ones: [reg]
+  self_conjugate: false
+
+- name: Decrement
+  description: "Decrement an n-bit register by 1 (inverse of Increment)"
+  qregs:
+    - {name: reg, type: UnsignedInteger}
+  params:
+    - {name: n_bits, type: int}
+  impl:
+    - loop_reverse:
+        iterations: n_bits
+        body:
+          - op: X
+            qregs: [reg]
+            controllers:
+              all_ones: [reg]
+  self_conjugate: false

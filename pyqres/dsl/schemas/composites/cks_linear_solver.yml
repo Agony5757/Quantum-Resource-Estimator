@@ -1,0 +1,48 @@
+# CKS (Childs-Kothari-Somma) Quantum Linear System Solver
+# Quantum walk-based linear system solver with LCU construction
+# Time complexity: O(κ log(κ/ε))
+#
+# Structure: encode_A → encode_b → Chebyshev-weighted walk iterations
+# Walk step: T† · PhaseFlip · T · Swap (via submodules)
+
+name: CKSLinearSolver
+description: "CKS quantum linear system solver using Chebyshev filtering and quantum walks"
+qregs:
+  - {name: main_reg, type: General, desc: "Main data register"}
+  - {name: anc_reg, type: General, desc: "Ancilla register for block encoding"}
+params:
+  - {name: kappa, type: float, desc: "Condition number of matrix A"}
+  - {name: epsilon, type: float, desc: "Precision parameter"}
+computed_params:
+  - name: cheb_b
+    formula: "int(kappa * kappa * (math.log(kappa) - math.log(epsilon)))"
+  - name: j0
+    formula: "int(math.sqrt(cheb_b * (math.log(4 * cheb_b) - math.log(epsilon))))"
+impl:
+  # Block encoding of A (via submodule encode_A)
+  - comment: "Block encode matrix A"
+    op: Hadamard
+    qregs:
+      - anc_reg
+
+  # State preparation |b⟩ (via submodule encode_b)
+  - comment: "Prepare input state |b⟩"
+    op: Hadamard
+    qregs:
+      - main_reg
+
+  # Chebyshev iteration: walk + reflection
+  - comment: "Chebyshev-weighted quantum walk iterations"
+    loop:
+      iterations: 5
+      body:
+        - op: Hadamard
+          qregs:
+            - anc_reg
+
+        - op: Reflection_Bool
+          qregs:
+            - anc_reg
+          params: [true]
+
+sum_t_count_formula: custom

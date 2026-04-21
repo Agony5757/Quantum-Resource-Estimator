@@ -1,0 +1,13 @@
+# Clifford+T gate set
+# Standard universal gate set for fault-tolerant quantum computing
+
+name: clifford_t
+description: "Clifford+T gate set - standard universal gate set for fault-tolerant quantum computing"
+primitives:
+  - Hadamard
+  - S
+  - T
+  - CNOT
+  - X
+  - Y
+  - Z

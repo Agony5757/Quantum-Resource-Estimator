@@ -1,0 +1,16 @@
+# Composed quantum operations (built from other operations)
+
+- name: Swap
+  description: "Swap two registers via 3 CNOTs"
+  qregs:
+    - {name: reg1, type: General}
+    - {name: reg2, type: General}
+  impl:
+    - op: CNOT
+      qregs: [reg1, reg2]
+    - op: CNOT
+      qregs: [reg2, reg1]
+    - op: CNOT
+      qregs: [reg1, reg2]
+  control_override: cnot_swap
+  self_conjugate: true

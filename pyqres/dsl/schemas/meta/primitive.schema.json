@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/primitive.schema.json",
+  "title": "Primitive Set",
+  "description": "Schema for Quantum-Resource-Estimator primitive set definitions",
+  "type": "object",
+  "required": ["name", "primitives"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Primitive set name (snake_case)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the primitive set"
+    },
+    "primitives": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "List of primitive operation names"
+    }
+  },
+  "additionalProperties": false
+}

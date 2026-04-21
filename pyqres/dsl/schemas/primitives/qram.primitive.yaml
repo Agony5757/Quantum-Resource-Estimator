@@ -1,0 +1,10 @@
+# QRAM-based gate set
+# Includes QRAM as a primitive for state preparation
+
+name: qram
+description: "QRAM-based gate set - includes QRAM primitive for state preparation"
+primitives:
+  - QRAM
+  - Toffoli
+  - Hadamard
+  - T

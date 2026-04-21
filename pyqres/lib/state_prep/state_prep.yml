@@ -1,0 +1,31 @@
+# State preparation operations library
+# Common state preparation routines
+
+- name: UniformSuperposition
+  description: "Prepare uniform superposition over n qubits"
+  qregs:
+    - {name: reg, type: General}
+  params:
+    - {name: n_qubits, type: int}
+  impl:
+    - for_each:
+        var: i
+        items: "range(n_qubits)"
+        body:
+          - op: Hadamard
+            qregs: [reg]
+  self_conjugate: false
+
+- name: BasisState
+  description: "Prepare a computational basis state"
+  qregs:
+    - {name: reg, type: General}
+  params:
+    - {name: state_value, type: int}
+  impl:
+    - python: |
+        bin_str = bin(state_value)[2:][::-1]
+        for i, bit in enumerate(bin_str):
+            if bit == '1':
+                self.program_list.append(OperationRegistry.get_class('X')(reg_list=[self.reg]))
+  self_conjugate: true

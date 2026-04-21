@@ -1,0 +1,43 @@
+# Quantum Phase Estimation
+# For finding eigenvalues of unitary operators
+
+name: QuantumPhaseEstimation
+description: "Quantum phase estimation for finding eigenvalues"
+qregs:
+  - {name: precision_reg, type: General, desc: "Precision (counting) register"}
+  - {name: eigenstate_reg, type: General, desc: "Eigenstate register"}
+params:
+  - {name: n_precision, type: int, desc: "Number of precision qubits"}
+  - {name: unitary_name, type: str, desc: "Name of unitary to estimate (placeholder)"}
+impl:
+  # Initialize precision register
+  - comment: "Initialize with Hadamard"
+    op: Hadamard
+    qregs: [precision_reg]
+
+  # Controlled unitary applications
+  - comment: "Controlled unitary iterations (unitary omitted for generic template)"
+    loop:
+      iterations: n_precision
+      body:
+        # Placeholder controlled unitary (requires custom implementation)
+        - op: Init_Unsafe
+          qregs:
+            - eigenstate_reg
+          params: [0]
+          controllers:
+            all_ones:
+              - precision_reg
+
+        # Shift for next iteration
+        - op: PhaseGate
+          qregs:
+            - precision_reg
+          params: [0.785398, 0.01]
+
+  # Inverse QFT for measurement
+  - comment: "Inverse QFT for phase extraction"
+    op: InverseQFT
+    qregs: [precision_reg]
+
+sum_t_count_formula: custom
