@@ -1,23 +1,49 @@
+"""pyqres algorithms module.
+
+This module provides resource estimation for quantum algorithms.
+Mathematical components are imported from PySparQ for consistency.
+"""
+
 from .amplitude_amplification import AmplitudeAmplification
 from .tomography import Tomography
 from .linear_solver import LinearSolver
 from .shor import ShorFactor, SemiClassicalShor, factor
+
+# CKS solver - local implementation with PySparQ imports
 from .cks_solver import (
-    SparseMatrix, SparseMatrixData,
+    CKSLinearSolver,
+    # Re-exported from PySparQ for convenience
+    SparseMatrix,
+    SparseMatrixData,
     ChebyshevPolynomialCoefficient,
-    get_coef_positive_only, get_coef_common, make_walk_angle_func,
-    CondRotQW, TOperator, QuantumWalk, QuantumWalkNSteps,
-    LCUContainer, CKSLinearSolver, cks_solve,
+    get_coef_positive_only,
+    get_coef_common,
+    make_walk_angle_func,
 )
+
+# QDA solver - local implementation with PySparQ imports
 from .qda_solver import (
-    chebyshev_T, dolph_chebyshev,
-    compute_fourier_coeffs, calculate_angles,
-    compute_fs, compute_rotation_matrix,
-    BlockEncodingHs, BlockEncodingHsPD,
-    WalkS, LCU, Filtering,
-    BlockEncoding, StatePreparation,
+    QDALinearSolver,
+    # Re-exported from PySparQ for convenience
+    compute_fs,
+    compute_rotation_matrix,
+    chebyshev_T,
+    dolph_chebyshev,
+    compute_fourier_coeffs,
+    calculate_angles,
     classical_to_quantum,
-    QDALinearSolver, qda_solve,
+)
+
+# Import additional classes from PySparQ for convenience
+from pysparq.algorithms import BlockEncoding, StatePreparation
+from pysparq.algorithms.cks_solver import cks_solve, LCUContainer
+from pysparq.algorithms.qda_solver import (
+    qda_solve,
+    BlockEncodingHs,
+    BlockEncodingHsPD,
+    WalkS,
+    LCU,
+    Filtering,
 )
 
 __all__ = [
@@ -28,18 +54,30 @@ __all__ = [
     "SemiClassicalShor",
     "factor",
     # CKS
-    "SparseMatrix", "SparseMatrixData",
+    "CKSLinearSolver",
+    "SparseMatrix",
+    "SparseMatrixData",
     "ChebyshevPolynomialCoefficient",
-    "get_coef_positive_only", "get_coef_common", "make_walk_angle_func",
-    "CondRotQW", "TOperator", "QuantumWalk", "QuantumWalkNSteps",
-    "LCUContainer", "CKSLinearSolver", "cks_solve",
+    "get_coef_positive_only",
+    "get_coef_common",
+    "make_walk_angle_func",
+    "cks_solve",
+    "LCUContainer",
     # QDA
-    "chebyshev_T", "dolph_chebyshev",
-    "compute_fourier_coeffs", "calculate_angles",
-    "compute_fs", "compute_rotation_matrix",
-    "BlockEncodingHs", "BlockEncodingHsPD",
-    "WalkS", "LCU", "Filtering",
-    "BlockEncoding", "StatePreparation",
+    "QDALinearSolver",
+    "compute_fs",
+    "compute_rotation_matrix",
+    "chebyshev_T",
+    "dolph_chebyshev",
+    "compute_fourier_coeffs",
+    "calculate_angles",
     "classical_to_quantum",
-    "QDALinearSolver", "qda_solve",
+    "qda_solve",
+    "BlockEncodingHs",
+    "BlockEncodingHsPD",
+    "WalkS",
+    "LCU",
+    "Filtering",
+    "BlockEncoding",
+    "StatePreparation",
 ]
