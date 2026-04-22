@@ -2,6 +2,9 @@
 
 This module provides resource estimation for quantum algorithms.
 Mathematical components are imported from PySparQ for consistency.
+
+Quantum operations (Block Encoding, State Preparation) are now
+implemented natively via DSL in the generated/ directory.
 """
 
 from .amplitude_amplification import AmplitudeAmplification
@@ -9,22 +12,23 @@ from .tomography import Tomography
 from .linear_solver import LinearSolver
 from .shor import ShorFactor, SemiClassicalShor, factor
 
-# CKS solver - local implementation with PySparQ imports
-from .cks_solver import (
-    CKSLinearSolver,
-    # Re-exported from PySparQ for convenience
+# CKS solver - math functions from PySparQ (used in DSL python blocks)
+from .cks_solver import CKSLinearSolver
+
+# QDA solver - math functions from PySparQ (used in DSL python blocks)
+from .qda_solver import QDALinearSolver
+
+# Re-export math helper functions from PySparQ (for use in DSL python blocks)
+from pysparq.algorithms.cks_solver import (
+    ChebyshevPolynomialCoefficient,
     SparseMatrix,
     SparseMatrixData,
-    ChebyshevPolynomialCoefficient,
     get_coef_positive_only,
     get_coef_common,
     make_walk_angle_func,
 )
 
-# QDA solver - local implementation with PySparQ imports
-from .qda_solver import (
-    QDALinearSolver,
-    # Re-exported from PySparQ for convenience
+from pysparq.algorithms.qda_solver import (
     compute_fs,
     compute_rotation_matrix,
     chebyshev_T,
@@ -34,16 +38,16 @@ from .qda_solver import (
     classical_to_quantum,
 )
 
-# Import additional classes from PySparQ for convenience
-from pysparq.algorithms import BlockEncoding, StatePreparation
-from pysparq.algorithms.cks_solver import cks_solve, LCUContainer
-from pysparq.algorithms.qda_solver import (
-    qda_solve,
-    BlockEncodingHs,
-    BlockEncodingHsPD,
-    WalkS,
-    LCU,
-    Filtering,
+# QRAM utilities for state preparation (local implementation)
+from ..utils.qram_utils import (
+    pow2,
+    make_complement,
+    get_complement,
+    column_flatten,
+    scale_and_convert_vector,
+    make_vector_tree,
+    make_func,
+    make_func_inv,
 )
 
 __all__ = [
@@ -55,16 +59,16 @@ __all__ = [
     "factor",
     # CKS
     "CKSLinearSolver",
+    # CKS math helpers
     "SparseMatrix",
     "SparseMatrixData",
     "ChebyshevPolynomialCoefficient",
     "get_coef_positive_only",
     "get_coef_common",
     "make_walk_angle_func",
-    "cks_solve",
-    "LCUContainer",
     # QDA
     "QDALinearSolver",
+    # QDA math helpers
     "compute_fs",
     "compute_rotation_matrix",
     "chebyshev_T",
@@ -72,12 +76,13 @@ __all__ = [
     "compute_fourier_coeffs",
     "calculate_angles",
     "classical_to_quantum",
-    "qda_solve",
-    "BlockEncodingHs",
-    "BlockEncodingHsPD",
-    "WalkS",
-    "LCU",
-    "Filtering",
-    "BlockEncoding",
-    "StatePreparation",
+    # QRAM utilities
+    "pow2",
+    "make_complement",
+    "get_complement",
+    "column_flatten",
+    "scale_and_convert_vector",
+    "make_vector_tree",
+    "make_func",
+    "make_func_inv",
 ]

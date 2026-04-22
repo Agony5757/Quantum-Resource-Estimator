@@ -11,8 +11,9 @@ from .arithmetic import (
     Compare_UInt_UInt, Less_UInt_UInt, GetMid_UInt_UInt,
     Assign, Swap_General_General,
     Div_Sqrt_Arccos_Int_Int, Sqrt_Div_Arccos_Int_Int, GetRotateAngle_Int_Int,
+    PlusOneAndOverflow, Add_Mult_UInt_ConstUInt,
 )
-from .register_ops import SplitRegister, CombineRegister, Push, Pop
+from .register_ops import SplitRegister, CombineRegister, Push, Pop, AddRegister, RemoveRegister
 from .transform import QFT, InverseQFT, Reflection_Bool
 from .state_prep import Normalize, ClearZero, Init_Unsafe, Rot_GeneralStatePrep
 from .qram import QRAM
@@ -31,8 +32,9 @@ __all__ = [
     "Compare_UInt_UInt", "Less_UInt_UInt", "GetMid_UInt_UInt",
     "Assign", "Swap_General_General",
     "Div_Sqrt_Arccos_Int_Int", "Sqrt_Div_Arccos_Int_Int", "GetRotateAngle_Int_Int",
+    "PlusOneAndOverflow", "Add_Mult_UInt_ConstUInt",
     # Register ops
-    "SplitRegister", "CombineRegister", "Push", "Pop",
+    "SplitRegister", "CombineRegister", "Push", "Pop", "AddRegister", "RemoveRegister",
     # Transform
     "QFT", "InverseQFT", "Reflection_Bool",
     # State prep

@@ -1,0 +1,25 @@
+# Block Encoding Operations
+# For complex operations, use Python classes in pyqres/algorithms/block_encoding.py
+
+# Simple tridiagonal block encoding placeholder
+# The actual implementation uses complex runtime-computed parameters
+# which don't fit well in the static DSL schema system
+
+- name: SimpleBlockEncoding
+  description: "Simple block encoding placeholder for resource estimation"
+  qregs:
+    - {name: main_reg, type: UnsignedInteger}
+    - {name: anc_reg, type: UnsignedInteger}
+  params:
+    - {name: alpha, type: float, desc: "Diagonal coefficient"}
+    - {name: beta, type: float, desc: "Off-diagonal coefficient"}
+  impl:
+    # Placeholder implementation for basic resource estimation
+    - op: Hadamard
+      qregs: [anc_reg]
+    - op: Reflection_Bool
+      qregs: [anc_reg]
+      params: [true]
+
+  self_conjugate: false
+  sum_t_count_formula: custom

@@ -2,21 +2,6 @@
 
 量子计算资源估计工具，基于寄存器级编程范式。估算 T-count、T-depth、Toffoli-count、Toffoli-depth，对接 PySparQ C++ 模拟器，支持 Quantikz LaTeX 线路图生成。
 
-## 常用命令
-
-```bash
-pip install -e .                  # 开发安装
-pytest tests/ -v                  # 运行全部 ~96 个测试
-pytest tests/test_simulation.py   # 仅运行 PySparQ 模拟测试（需安装 PySparQ）
-pyqres compile                    # 编译 YAML schema → Python 代码
-pyqres check                      # 完整性检查（依赖、覆盖率）
-pyqres show <operation> --depth 3 # 显示操作依赖树
-```
-
-## CI
-
-GitHub Actions (`.github/workflows/ci.yml`)：Python 3.10/3.12 矩阵测试，自动构建 PySparQ C++ 模拟器依赖。测试只需 `pytest tests/ -v`，无需安装 PySparQ（`conftest.py` 自动 mock）。
-
 ## 项目架构
 
 ```
@@ -140,12 +125,25 @@ Operation (metaclass=OperationMeta, auto-registers to OperationRegistry)
 - 生成的代码写入 `pyqres/generated/`，不要手动编辑（由 `pyqres compile` 生成）
 - 新增原语操作：在 `primitives/` 手写类，实现 `pyqsparse_object()` 和 `t_count()`
 - 新增组合操作：在 `dsl/schemas/composites/` 添加 YAML，然后运行 `pyqres compile`
-- 模拟测试需要安装 PySparQ（`pip install pysparq`），其他测试通过 conftest mock 运行
+- PySparQ 是必需依赖，通过 `pip install -e ".[test]"` 安装
 - `t_count()` 返回 `NotImplementedError` 的是占位符，待后续填充
+
+## 符号化资源估计
+
+支持使用 `sympy.Symbol` 进行参数化资源估计，T-count/T-depth 结果为符号表达式：
+
+```python
+from sympy import Symbol
+n = Symbol('n', positive=True, integer=True)
+op = MyAlgorithm(reg_list=[('reg', n)], param_list=[n])
+counter = TCounter()
+op.traverse(counter)
+print(counter.get_count())  # 输出符号表达式，如 7*n + 3
+```
 
 ## 外部依赖
 
-- **PySparQ** (`pysparq` on PyPI)：C++ 量子稀疏态模拟器，CI 自动构建，本地开发可省略
+- **PySparQ** (`pysparq` on PyPI)：C++ 量子稀疏态模拟器，必需依赖
 - **quantikz2**：LaTeX 包，生成线路图需系统安装 `pdflatex`
 - **运行时依赖**：numpy, lark, sympy, pyyaml
 

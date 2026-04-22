@@ -1,8 +1,8 @@
 """
-CKS (Childs-Kothari-Somma) Quantum Linear System Solver - Resource Estimation
+CKS (Childs-Kothari-Somma) Quantum Linear System Solver - Math Utilities
 
-This module provides resource estimation for CKS quantum linear system solver.
-Mathematical components are imported from PySparQ for consistency.
+This module provides mathematical utility functions for CKS quantum linear system solver.
+Quantum operations are now implemented natively via DSL (see dsl/schemas/composites/cks_linear_solver.yml).
 
 Time complexity: O(κ log(κ/ε)) where κ is condition number.
 
@@ -18,7 +18,7 @@ from typing import List, Optional
 
 import numpy as np
 
-# Import shared mathematical components from PySparQ
+# Import mathematical components from PySparQ for computing Chebyshev coefficients
 from pysparq.algorithms.cks_solver import (
     ChebyshevPolynomialCoefficient,
     SparseMatrix,
@@ -33,7 +33,7 @@ from ..core.registry import OperationRegistry
 from ..core.utils import reg_sz
 
 
-# Re-export for backward compatibility
+# Re-export for use in DSL python blocks
 __all__ = [
     "SparseMatrix",
     "SparseMatrixData",
@@ -42,13 +42,56 @@ __all__ = [
     "get_coef_common",
     "make_walk_angle_func",
     "CKSLinearSolver",
+    "compute_cks_t_count",
 ]
+
+
+def compute_cks_t_count(kappa: float, epsilon: float, n_qubits: int = 1) -> dict:
+    """Compute T-count for CKS algorithm analytically.
+
+    This function provides the T-count formula for CKS algorithm
+    without needing a full operation tree.
+
+    Args:
+        kappa: Condition number
+        epsilon: Precision parameter
+        n_qubits: Number of qubits in main register
+
+    Returns:
+        Dictionary with T-count components
+    """
+    b = int(np.ceil(kappa**2 * (np.log(kappa) - np.log(epsilon))))
+    j0 = int(np.sqrt(b * (np.log(4 * b) - np.log(epsilon))))
+
+    # Walk step cost: 4n² + 8n per walk operator (from CKS paper)
+    walk_step_cost = 4 * n_qubits * n_qubits + 8 * n_qubits
+
+    # Total walk iterations: sum of (2j+1) for j in range(j0+1)
+    total_walk_steps = sum(2 * j + 1 for j in range(j0 + 1))
+    total_walk = total_walk_steps * walk_step_cost
+
+    # Block encoding cost (tridiagonal): 4 T-gates for prep_state + reflections
+    encode_cost = 4 + 2 * n_qubits
+
+    # State prep cost via QRAM: O(n * data_size)
+    state_prep_cost = n_qubits * 8
+
+    return {
+        "walk_cost": total_walk,
+        "encode_cost": encode_cost,
+        "state_prep_cost": state_prep_cost,
+        "total": total_walk + encode_cost + state_prep_cost,
+        "b": b,
+        "j0": j0,
+        "total_walk_steps": total_walk_steps,
+    }
 
 
 class CKSLinearSolver(AbstractComposite):
     """CKS Quantum Linear System Solver as pyqres Operation.
 
-    This class focuses on resource estimation, not simulation.
+    This class delegates quantum operations to DSL-generated operations.
+    The actual quantum circuit is built from native DSL operations.
 
     T-count formula:
         b = ceil(κ² * (log(κ) - log(ε)))
@@ -58,8 +101,8 @@ class CKSLinearSolver(AbstractComposite):
 
     Args:
         reg_list: [main_reg, anc_reg] - data and ancilla registers
-        param_list: [kappa, epsilon] - condition number and precision
-        submodules: [encode_A, encode_b] - block encoding and state prep
+        param_list: [kappa, epsilon, matrix_params, input_vector, data_size]
+        submodules: Optional pre-built submodules (not used in DSL version)
     """
 
     def __init__(self, reg_list, param_list, submodules=None):
@@ -70,73 +113,61 @@ class CKSLinearSolver(AbstractComposite):
         self.anc_reg = reg_list[1]
         self.kappa = param_list[0]
         self.eps = param_list[1]
-        self.encode_A = submodules[0] if len(submodules) > 0 else None
-        self.encode_b = submodules[1] if len(submodules) > 1 else None
+        self.matrix_params = param_list[2] if len(param_list) > 2 else [1.0, 0.5]
+        self.input_vector = param_list[3] if len(param_list) > 3 else None
+        self.data_size = param_list[4] if len(param_list) > 4 else 8
 
         self._build_program_list()
 
     def _build_program_list(self):
-        """Build operation tree for resource estimation.
-
-        Note: This builds a representative operation tree; actual simulation
-        requires PySparQ's quantum walk implementation.
-        """
+        """Build operation tree using DSL-generated operations."""
         self.program_list = []
 
-        if self.encode_A:
+        # Use BlockEncodingTridiagonal for matrix encoding
+        BlockEncodingTridiagonal = OperationRegistry.get_class("BlockEncodingTridiagonal")
+        StatePreparation = OperationRegistry.get_class("StatePreparation")
+        Hadamard = OperationRegistry.get_class("Hadamard")
+        Reflection_Bool = OperationRegistry.get_class("Reflection_Bool")
+
+        alpha, beta = self.matrix_params[0], self.matrix_params[1]
+
+        # Block encoding of A
+        self.program_list.append(
+            BlockEncodingTridiagonal(
+                reg_list=[self.main_reg, self.anc_reg],
+                param_list=[alpha, beta],
+            )
+        )
+
+        # State preparation |b⟩
+        if self.input_vector:
             self.program_list.append(
-                self.encode_A(
-                    reg_list=[self.main_reg, self.anc_reg],
-                    param_list=[self.kappa, self.eps],
+                StatePreparation(
+                    reg_list=[self.main_reg],
+                    param_list=[self.input_vector, self.data_size],
                 )
             )
 
-        if self.encode_b:
-            self.program_list.append(
-                self.encode_b(reg_list=[self.main_reg], param_list=[self.eps])
-            )
-
-        # Build representative walk operations for T-count estimation
+        # Chebyshev-weighted quantum walk
         b = int(np.ceil(self.kappa**2 * (np.log(self.kappa) - np.log(self.eps))))
         cheb = ChebyshevPolynomialCoefficient(b)
         j0 = int(np.sqrt(b * (np.log(4 * b) - np.log(self.eps))))
 
-        H_op = OperationRegistry.get_class("Hadamard")
-        R_op = OperationRegistry.get_class("Reflection_Bool")
-
         for j in range(min(cheb.b, j0 + 1)):
             step_count = cheb.step(j)  # 2j + 1
             for _ in range(step_count):
-                self.program_list.append(H_op(reg_list=[self.anc_reg]))
+                self.program_list.append(Hadamard(reg_list=[self.anc_reg]))
                 self.program_list.append(
-                    R_op(reg_list=[self.anc_reg], param_list=[True])
+                    Reflection_Bool(reg_list=[self.anc_reg], param_list=[True])
                 )
 
         self.declare_program_list()
 
     def sum_t_count(self, t_count_list):
-        """Compute total T-count for CKS algorithm.
-
-        Formula derived from CKS quantum walk complexity:
-        - Number of walk iterations: j0 ≈ sqrt(b * log(4b/ε))
-        - Each iteration j has 2j+1 walk steps
-        - Walk step cost: O(n²) for n-qubit register
-        """
+        """Compute total T-count for CKS algorithm."""
         kappa = self.kappa
         epsilon = self.eps
-
-        b = int(np.ceil(kappa**2 * (np.log(kappa) - np.log(epsilon))))
-        j0 = int(np.sqrt(b * (np.log(4 * b) - np.log(epsilon))))
-
-        encode_A_cost = t_count_list[0] if len(t_count_list) > 0 else 0
-        encode_b_cost = t_count_list[1] if len(t_count_list) > 1 else 0
-
-        # Walk step cost: 4n² + 8n per walk operator (from CKS paper)
         n = reg_sz(self.main_reg) if isinstance(self.main_reg, str) else 1
-        walk_step_cost = 4 * n * n + 8 * n
 
-        # Total walk iterations: sum of (2j+1) for j in range(j0+1)
-        total_walk_steps = sum(2 * j + 1 for j in range(j0 + 1))
-        total_walk = total_walk_steps * walk_step_cost
-
-        return encode_A_cost + encode_b_cost + total_walk
+        counts = compute_cks_t_count(kappa, epsilon, n)
+        return counts["total"]

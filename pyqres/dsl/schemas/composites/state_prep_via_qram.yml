@@ -1,51 +1,18 @@
-# State Preparation via QRAM
-# Simplified version - full implementation would need more complex template handling
-# Prepares a quantum state from classical data stored in QRAM
+# State Preparation Operations
+# For complex QRAM-based operations, use Python classes
 
-name: StatePrep_via_QRAM
-description: "Prepare quantum state from QRAM-stored probability amplitudes"
-qregs:
-  - {name: work_qubit, type: General}
-params:
-  - {name: addr_size, type: int}
-  - {name: data_size, type: int}
-temp_regs:
-  - {name: rotation, size: 1}
-  - {name: data_tmp, size: 1}
-impl:
-  # Initialize: shift right
-  - op: ShiftRight
-    qregs: [work_qubit]
-    params: [1]
+- name: SimpleStatePrep
+  description: "Simple state preparation for uniform superposition"
+  qregs:
+    - {name: reg, type: General}
+  params:
+    - {name: n_qubits, type: int}
+  impl:
+    - for_each:
+        var: i
+        items: "range(n_qubits)"
+        body:
+          - op: Hadamard
+            qregs: [reg]
 
-  # Tree-based state preparation loop
-  - comment: "Tree-based state preparation loop"
-    loop:
-      iterations: addr_size
-      body:
-        # Split rotation qubit
-        - op: SplitRegister
-          qregs: [work_qubit]
-          params: [rotation]
-
-        # Apply Hadamard and conditional rotations (simplified)
-        - op: Hadamard
-          qregs: [rotation]
-
-        # Merge back
-        - op: CombineRegister
-          qregs: [work_qubit, rotation]
-
-        # Shift
-        - op: ShiftLeft
-          qregs: [work_qubit]
-          params: [1]
-
-  # Final shift
-  - op: ShiftRight
-    qregs: [work_qubit]
-    params: [1]
-
-  # Clear zero
-  - op: ClearZero
-    qregs: []
+  self_conjugate: false

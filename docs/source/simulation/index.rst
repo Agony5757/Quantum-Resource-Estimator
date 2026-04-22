@@ -20,8 +20,8 @@ PySparQ 集成
 ------------
 
 - PySparQ 是 C++ 实现的量子稀疏态模拟器
-- 安装方式：``pip install pysparq``
-- CI 自动构建，本地开发可省略（测试使用 mock）
+- 安装方式：``pip install pysparq`` 或通过 ``pip install -e ".[test]"`` 安装完整依赖
+- PySparQ 是必需依赖，所有测试都需要安装
 
 Primitive 的模拟
 ----------------
