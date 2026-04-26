@@ -300,6 +300,93 @@ for angle in [0.1, 0.2, 0.3]:
                     qregs: [reg1]
 ```
 
+### 控制与逆操作（Control & Dagger）
+
+Quantum-Resource-Estimator 提供了两种强大的量子操作变换机制：**控制（Control）** 和 **逆操作（Dagger）**。
+
+#### 控制器链（Controller Chain）
+
+控制器用于实现量子控制，即操作在满足特定条件时才执行。系统支持 4 种控制类型：
+
+| 控制类型 | 方法 | 说明 |
+|---------|------|------|
+| `all_ones` | `control_by_all_ones(reg)` | 寄存器所有比特都为 1 时执行 |
+| `nonzero` | `control_by_nonzero(reg)` | 寄存器值非零时执行 |
+| `bit` | `control_by_bit((reg, bit))` | 指定比特为 1 时执行 |
+| `value` | `control_by_value((reg, val))` | 寄存器等于指定值时执行 |
+
+**流式 API 示例：**
+
+```python
+from pyqres.primitives import X, CNOT
+from pyqres.core.metadata import RegisterMetadata
+
+# 声明寄存器
+RegisterMetadata.get_register_metadata().declare_register('ctrl', 2)
+RegisterMetadata.get_register_metadata().declare_register('target', 1)
+
+# 单控制：ctrl 全为 1 时翻转 target
+X(['target']).control_by_all_ones(['ctrl'])
+
+# 多控制：组合不同控制类型
+X(['target']).control_by_all_ones(['ctrl1']).control_by_nonzero(['ctrl2'])
+```
+
+**在 YAML 中使用控制器：**
+
+```yaml
+impl:
+  - op: X
+    qregs: [target]
+    controllers:
+      all_ones: [ctrl_reg]           # 全 1 控制
+      nonzero: [flag_reg]            # 非 0 控制
+      bit: [[flag, 1]]               # 比特控制（flag 寄存器的第 1 位）
+      value: [[addr, 5]]             # 值控制（addr == 5）
+```
+
+**控制器传播规则：**
+
+控制器会自动向下传播到子操作。例如，控制一个组合操作时，所有子操作都会继承该控制条件：
+
+```python
+# Swap 受控时，其内部所有 CNOT 都会继承控制条件
+swap = Swap(['a', 'b']).control_by_all_ones(['ctrl'])
+```
+
+#### 逆操作（Dagger）
+
+逆操作实现量子门的厄米共轭（Hermitian adjoint），即 U†。使用 `.dagger()` 方法：
+
+```python
+# 创建逆操作
+inverse_op = MyOperation(['reg']).dagger()
+
+# dagger 可以链式调用，两次调用恢复原操作
+original = op.dagger().dagger()  # 等价于 op
+```
+
+**Dagger 传播规则：**
+
+1. **默认行为**：dagger 传播到子操作，子节点以**逆序**遍历
+2. **自伴操作**：`__self_conjugate__ = True` 的操作在 dagger 时行为不变
+
+```python
+class Hadamard(Primitive):
+    __self_conjugate__ = True  # H† = H，dagger 传播在此停止
+
+class T(Primitive):
+    __self_conjugate__ = False  # T† ≠ T，需要特殊处理
+```
+
+**自伴操作列表：**
+- 单比特门：`Hadamard`, `X`, `Y`, `Z`
+- 多比特门：`CNOT`, `Toffoli`, `Swap`
+
+**非自伴操作列表：**
+- 旋转门：`T`, `Rx(theta)`, `Ry(theta)`, `Rz(theta)`, `Phase(theta)`
+- 这些门的 dagger 会取负角度
+
 ### 特殊配置
 
 #### self_conjugate
@@ -322,21 +409,27 @@ impl:
 self_conjugate: true  # Swap† = Swap
 ```
 
-**自伴操作的例子：**
-- `Hadamard`: H† = H
-- `X`, `Y`, `Z`: Pauli 门是自伴的
-- `CNOT`: CNOT† = CNOT
-- `Toffoli`: Toffoli† = Toffoli
-- `Swap`: Swap† = Swap
-
-**非自伴操作的例子：**
-- `T`: T† = T†（不同的门）
-- `Rx(theta)`: Rx†(theta) = Rx(-theta)
-- `Phase(theta)`: Phase†(theta) = Phase(-theta)
-
 #### control_override
 
-某些操作需要特殊的控制器传播方式（如 Swap 的 CNOT 链）：
+某些组合操作的控制器传播需要特殊处理。以 **Swap = 3 CNOT** 为例：
+
+**问题背景：**
+
+Swap 操作由三个 CNOT 组成：
+```
+CNOT(a, b) → CNOT(b, a) → CNOT(a, b)
+```
+
+如果简单地让控制器传播到所有 CNOT，受控 Swap 会变成：
+```
+C-CNOT(a, b) → C-CNOT(b, a) → C-CNOT(a, b)
+```
+
+但这**不是**正确的受控 Swap！正确的受控 Swap 应该只控制"核心"操作——中间的 CNOT。
+
+**解决方案：**
+
+使用 `control_override: cnot_swap` 指定特殊的控制器传播模式：
 
 ```yaml
 name: Swap
@@ -351,24 +444,76 @@ impl:
   - op: CNOT
     qregs: [reg1, reg2]
 control_override: cnot_swap  # 只有中间的 CNOT 接收控制器
+self_conjugate: true
 ```
 
-**内置的 control_override 模式：**
-- `cnot_swap`: 用于 Swap 操作，只有中间的 CNOT 接收控制器
+**生成的代码：**
+
+```python
+class Swap(StandardComposite):
+    __self_conjugate__ = True
+
+    def __init__(self, reg_list):
+        ...
+
+    def traverse_children(self, visitor, dagger_ctx=False, controllers_ctx=None):
+        controllers_ctx = controllers_ctx or {}
+        controllers = merge_controllers(self.controllers, controllers_ctx)
+        self.program_list[0].traverse(visitor, False, {})          # 第一个 CNOT 无控制
+        self.program_list[1].traverse(visitor, False, controllers)  # 中间 CNOT 受控
+        self.program_list[2].traverse(visitor, False, {})          # 第三个 CNOT 无控制
+```
+
+**为什么这样是正确的？**
+
+受控 Swap 的电路结构：
+```
+        ┌───┐
+ctrl: ──┤   ├── ...
+        │ S │
+  a: ───┤ W ├── ...
+        │ A │
+  b: ───┤ P ├── ...
+        └───┘
+```
+
+实际上等价于：
+```
+  a: ──■───────■──
+        │       │
+  b: ───┼───■───┼──
+        │   │   │
+ctrl: ──┼───■───┼──  ← 只有中间 CNOT 受控
+        │       │
+      ──┴───────┴──
+```
+
+第一个和第三个 CNOT 实现的是"交换首尾"的功能，不需要控制条件。只有中间的 CNOT 才是真正的"条件交换"。
+
+**内置 control_override 模式：**
+
+| 模式 | 用途 | 控制器传播行为 |
+|------|------|---------------|
+| `cnot_swap` | Swap 类操作 | 只有 `program_list[1]`（中间操作）接收控制器 |
 
 **自定义 control_override：**
 
-要定义自定义的控制器传播模式，需要在生成的类中手动实现 `traverse_children` 方法：
+对于更复杂的控制器传播需求，可以手动实现 `traverse_children` 方法：
 
 ```python
+from pyqres.core.operation import StandardComposite
+from pyqres.core.utils import merge_controllers
+
 class MyCustomOperation(StandardComposite):
     def traverse_children(self, visitor, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = controllers_ctx or {}
         controllers = merge_controllers(self.controllers, controllers_ctx)
+
         # 自定义控制器传播逻辑
-        self.program_list[0].traverse(visitor, dagger_ctx, {})  # 无控制器
-        self.program_list[1].traverse(visitor, dagger_ctx, controllers)  # 有控制器
-        self.program_list[2].traverse(visitor, dagger_ctx, {})  # 无控制器
+        # 例如：奇偶索引的操作交替接收控制器
+        for i, program in enumerate(self.program_list):
+            ctrl = controllers if i % 2 == 1 else {}
+            program.traverse(visitor, dagger_ctx, ctrl)
 ```
 
 #### sum_t_count_formula

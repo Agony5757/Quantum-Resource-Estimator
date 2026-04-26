@@ -1,57 +1,25 @@
 # QDA (Quantum Discrete Adiabatic) Linear System Solver
-# Optimal-scaling quantum linear solver using adiabatic evolution
-# Time complexity: O(κ log(κ/ε)) - optimal
-#
-# Two variants share the same upper-level QDA:
-# 1. Tridiagonal: BlockEncodingTridiagonal for structured matrices
-# 2. QRAM: QRAM-based block encoding for general sparse matrices
-#
-# Both use the same WalkS + LCU + Filtering pipeline.
+# DSL placeholder for resource estimation
+# Full implementation in pyqres/algorithms/qda_solver.py
 
 name: QDALinearSolver
 description: "QDA quantum linear system solver using discrete adiabatic evolution"
 qregs:
-  - {name: main_reg, type: General, desc: "Main data register"}
-  - {name: anc_UA, type: General, desc: "Ancilla for block encoding"}
+  - {name: main_reg, type: UnsignedInteger, desc: "Main data register"}
+  - {name: anc_UA, type: UnsignedInteger, desc: "Ancilla for block encoding"}
   - {name: anc_1, type: Boolean, desc: "Ancilla Boolean 1"}
   - {name: anc_2, type: Boolean, desc: "Ancilla Boolean 2"}
-  - {name: anc_3, type: Boolean, desc: "Ancilla Boolean 3"}
-  - {name: anc_4, type: Boolean, desc: "Ancilla Boolean 4"}
 params:
   - {name: kappa, type: float, desc: "Condition number of matrix A"}
   - {name: epsilon, type: float, desc: "Precision parameter"}
 computed_params:
-  - name: adiab_steps
-    formula: "int(kappa + 1)"
+  - name: n_steps
+    formula: "int(math.ceil(math.log(kappa / epsilon)))"
 impl:
-  # Initialize to H₀ eigenstate
-  - comment: "Initialize to H₀ eigenstate (|1⟩ on first qubit)"
-    op: X
-    qregs:
-      - main_reg
-    params: [0]
-
-  # Adiabatic evolution loop
-  - comment: "Discrete adiabatic evolution with WalkS"
-    loop:
-      iterations: adiab_steps
-      body:
-        # Block encoding of H(s) at this discretization point
-        - op: Hadamard
-          qregs:
-            - anc_3
-
-        # Reflection
-        - op: Reflection_Bool
-          qregs:
-            - anc_2
-          params: [false]
-
-  # Post-select
-  - comment: "Post-select on ancilla"
-    op: X
-    qregs:
-      - anc_1
+  # Placeholder implementation for DSL compilation
+  # Actual quantum operations are in the Python class
+  - op: X
+    qregs: [main_reg]
     params: [0]
 
 sum_t_count_formula: custom

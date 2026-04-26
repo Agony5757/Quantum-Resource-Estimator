@@ -295,3 +295,56 @@ class GetRotateAngle_Int_Int(Primitive):
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
         raise NotImplementedError("GetRotateAngle_Int_Int t_count not yet parameterized")
+
+
+class PlusOneAndOverflow(Primitive):
+    """Increment register by 1 with overflow tracking.
+
+    Used in block encoding for tridiagonal matrices.
+    """
+
+    def __init__(self, reg_list, param_list=None):
+        super().__init__(reg_list, param_list)
+        self.main_reg = reg_list[0]
+        self.overflow_reg = reg_list[1]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
+        obj = PyQSparseOperationWrapper(
+            pysparq.PlusOneAndOverflow(self.main_reg, self.overflow_reg))
+        obj.set_dagger(dagger_ctx ^ self.dagger_flag)
+        obj.set_controller(controllers_ctx)
+        return obj
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        ncontrols = get_control_qubit_count(
+            merge_controllers(self.controllers, controllers_ctx or {}))
+        n = reg_sz(self.main_reg)
+        return n * mcx_t_count(ncontrols + 2)
+
+
+class Add_Mult_UInt_ConstUInt(Primitive):
+    """Combined add and multiply operation: output = input + multiplier * const.
+
+    Used in QRAM-based block encoding for address computation.
+    """
+
+    def __init__(self, reg_list, param_list):
+        super().__init__(reg_list=reg_list, param_list=param_list)
+        self.input_reg = reg_list[0]
+        self.output_reg = reg_list[1]
+        self.multiplier = param_list[0]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
+        obj = PyQSparseOperationWrapper(
+            pysparq.Add_Mult_UInt_ConstUInt(self.input_reg, self.multiplier, self.output_reg))
+        obj.set_dagger(dagger_ctx ^ self.dagger_flag)
+        obj.set_controller(controllers_ctx)
+        return obj
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        ncontrols = get_control_qubit_count(
+            merge_controllers(self.controllers, controllers_ctx or {}))
+        n = reg_sz(self.input_reg)
+        return (n - 1) ** 2 * mcx_t_count(ncontrols + 2)

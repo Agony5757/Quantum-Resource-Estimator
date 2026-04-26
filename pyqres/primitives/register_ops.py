@@ -103,3 +103,51 @@ class Pop(Primitive):
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
         return 0
+
+
+class AddRegister(Primitive):
+    """Add a new register to the quantum state.
+
+    This is a meta-operation that extends the state space.
+    Used in state preparation and block encoding algorithms.
+    """
+
+    def __init__(self, reg_list, param_list):
+        super().__init__(reg_list=reg_list, param_list=param_list)
+        self.reg_name = param_list[0]
+        self.reg_type = param_list[1]  # e.g., 'UnsignedInteger', 'SignedInteger', 'Boolean', 'Rational'
+        self.reg_size = param_list[2]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        # Map string type to pysparq StateStorageType
+        type_map = {
+            'UnsignedInteger': pysparq.UnsignedInteger,
+            'SignedInteger': pysparq.SignedInteger,
+            'Boolean': pysparq.Boolean,
+            'Rational': pysparq.Rational,
+            'General': pysparq.General,
+        }
+        reg_type = type_map.get(self.reg_type, pysparq.General)
+        return PyQSparseOperationWrapper(
+            pysparq.AddRegister(self.reg_name, reg_type, self.reg_size))
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        return 0
+
+
+class RemoveRegister(Primitive):
+    """Remove a register from the quantum state.
+
+    This is a meta-operation that shrinks the state space.
+    Used for cleaning up temporary registers.
+    """
+
+    def __init__(self, reg_list, param_list):
+        super().__init__(reg_list=reg_list, param_list=param_list)
+        self.reg_name = param_list[0]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        return PyQSparseOperationWrapper(pysparq.RemoveRegister(self.reg_name))
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        return 0
