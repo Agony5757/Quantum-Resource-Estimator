@@ -65,3 +65,24 @@ class Rot_GeneralStatePrep(Primitive):
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
         raise NotImplementedError("Rot_GeneralStatePrep t_count not yet parameterized")
+
+
+class ViewNormalization(Primitive):
+    """Apply QRAM view normalization (l2-norm normalization over a view).
+
+    Normalizes the amplitude vector within a QRAM memory view.
+    T-count = 0 (no non-Clifford gates needed for normalization).
+    """
+    __self_conjugate__ = True
+
+    def __init__(self, reg_list, param_list=None):
+        super().__init__(reg_list, param_list)
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
+        obj = PyQSparseOperationWrapper(pysparq.ViewNormalization())
+        obj.set_controller(controllers_ctx)
+        return obj
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        return 0

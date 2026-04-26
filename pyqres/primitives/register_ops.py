@@ -105,49 +105,87 @@ class Pop(Primitive):
         return 0
 
 
-class AddRegister(Primitive):
-    """Add a new register to the quantum state.
+# ==============================================================================
+# New register management primitives (Phase 2)
+# ==============================================================================
 
-    This is a meta-operation that extends the state space.
-    Used in state preparation and block encoding algorithms.
+
+class AddRegister(Primitive):
+    """Add a new quantum register to the system.
+
+    Registers must be declared before they can be used in other operations.
+    Note: this is a system management operation, not a quantum gate.
+    T-count = 0.
     """
+    __self_conjugate__ = True
 
     def __init__(self, reg_list, param_list):
         super().__init__(reg_list=reg_list, param_list=param_list)
-        self.reg_name = param_list[0]
-        self.reg_type = param_list[1]  # e.g., 'UnsignedInteger', 'SignedInteger', 'Boolean', 'Rational'
-        self.reg_size = param_list[2]
+        self.name = param_list[0]
+        self.reg_type = param_list[1]  # pysparq.StateStorageType
+        self.size = param_list[2]
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
-        # Map string type to pysparq StateStorageType
-        type_map = {
-            'UnsignedInteger': pysparq.UnsignedInteger,
-            'SignedInteger': pysparq.SignedInteger,
-            'Boolean': pysparq.Boolean,
-            'Rational': pysparq.Rational,
-            'General': pysparq.General,
-        }
-        reg_type = type_map.get(self.reg_type, pysparq.General)
-        return PyQSparseOperationWrapper(
-            pysparq.AddRegister(self.reg_name, reg_type, self.reg_size))
+        return pysparq.AddRegister(self.name, self.reg_type, self.size)
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        return 0
+
+
+class AddRegisterWithHadamard(Primitive):
+    """Add a new quantum register initialized with Hadamard superposition.
+
+    Equivalent to AddRegister + Hadamard on all qubits.
+    T-count = 0.
+    """
+    __self_conjugate__ = True
+
+    def __init__(self, reg_list, param_list):
+        super().__init__(reg_list=reg_list, param_list=param_list)
+        self.name = param_list[0]
+        self.reg_type = param_list[1]
+        self.size = param_list[2]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        return pysparq.AddRegisterWithHadamard(self.name, self.reg_type, self.size)
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
         return 0
 
 
 class RemoveRegister(Primitive):
-    """Remove a register from the quantum state.
+    """Remove a quantum register from the system.
 
-    This is a meta-operation that shrinks the state space.
-    Used for cleaning up temporary registers.
+    Note: this is a system management operation.
+    T-count = 0.
     """
+    __self_conjugate__ = True
 
     def __init__(self, reg_list, param_list):
         super().__init__(reg_list=reg_list, param_list=param_list)
-        self.reg_name = param_list[0]
+        self.name = param_list[0]
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
-        return PyQSparseOperationWrapper(pysparq.RemoveRegister(self.reg_name))
+        return pysparq.RemoveRegister(self.name)
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        return 0
+
+
+class MoveBackRegister(Primitive):
+    """Move a register back to its original position in the system.
+
+    Used to restore register order after temporary operations.
+    T-count = 0.
+    """
+    __self_conjugate__ = True
+
+    def __init__(self, reg_list, param_list=None):
+        super().__init__(reg_list, param_list)
+        self.reg = reg_list[0]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        return pysparq.MoveBackRegister(self.reg)
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
         return 0

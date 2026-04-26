@@ -50,6 +50,41 @@ pyqres.primitives
    :show-inheritance:
    :special-members: __init__
 
+新门 (Phase 2)
+~~~~~~~~~~~~~~
+
+.. autoclass:: Hadamard_Bool
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: Hadamard_PartialQubit
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: Sgate
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: Tgate
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: SXgate
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: U2gate
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: Swap_Bool_Bool
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: GlobalPhase
+   :show-inheritance:
+   :special-members: __init__
+
 算术操作
 --------
 
@@ -103,6 +138,33 @@ pyqres.primitives
    :show-inheritance:
    :special-members: __init__
 
+新算术操作 (Phase 2)
+~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: Add_Mult_UInt_ConstUInt
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: AddAssign_AnyInt_AnyInt
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: CustomArithmetic
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: PlusOneAndOverflow
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: GetDataAddr
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: GetRowAddr
+   :show-inheritance:
+   :special-members: __init__
+
 寄存器操作
 ----------
 
@@ -121,6 +183,25 @@ pyqres.primitives
    :special-members: __init__
 
 .. autoclass:: Pop
+   :show-inheritance:
+   :special-members: __init__
+
+新寄存器操作 (Phase 2)
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. autoclass:: AddRegister
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: AddRegisterWithHadamard
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: RemoveRegister
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: MoveBackRegister
    :show-inheritance:
    :special-members: __init__
 
@@ -154,11 +235,81 @@ pyqres.primitives
    :show-inheritance:
    :special-members: __init__
 
+.. autoclass:: Init_Unsafe
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: Rot_GeneralStatePrep
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: ViewNormalization
+   :show-inheritance:
+   :special-members: __init__
+
 QRAM
 ----
 
 .. currentmodule:: pyqres.primitives.qram
 
 .. autoclass:: QRAM
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: QRAMFast
+   :show-inheritance:
+   :special-members: __init__
+
+条件旋转
+--------
+
+.. currentmodule:: pyqres.primitives.cond_rot
+
+.. autoclass:: CondRot_General_Bool
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: CondRot_General_Bool_QW
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: ZeroConditionalPhaseFlip
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: RangeConditionalPhaseFlip
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: CondRot_Rational_Bool
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: Rot_GeneralUnitary
+   :show-inheritance:
+   :special-members: __init__
+
+测量
+----
+
+.. currentmodule:: pyqres.primitives.measurement
+
+.. autoclass:: PartialTrace
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: PartialTraceSelect
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: PartialTraceSelectRange
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: Prob
+   :show-inheritance:
+   :special-members: __init__
+
+.. autoclass:: StatePrint
    :show-inheritance:
    :special-members: __init__
