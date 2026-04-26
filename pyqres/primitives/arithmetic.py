@@ -331,6 +331,48 @@ class Add_Mult_UInt_ConstUInt(Primitive):
         return (n - 1) * mcx_t_count(ncontrols + 2)
 
 
+class Mod_Mult_UInt_ConstUInt(Primitive):
+    """Modular multiplication: |y⟩ → |y * a^(2^x) mod N⟩.
+
+    Computes y * a^(2^x) mod N and stores the result back in the register
+    (in-place). Core primitive for Shor's algorithm.
+
+    Args:
+        reg_list: [reg] — single UnsignedInteger register
+        param_list: [a, x, N]
+            a: base for exponentiation
+            x: exponent bit position (computes a^(2^x) mod N)
+            N: modulus
+
+    Note:
+        This is the C++ primitive (pysparq.Mod_Mult_UInt_ConstUInt).
+        Compare: pysparq.ModMul which is a Python composite using this primitive.
+    """
+    __self_conjugate__ = False  # dagger requires modular inverse
+
+    def __init__(self, reg_list, param_list):
+        super().__init__(reg_list=reg_list, param_list=param_list)
+        self.reg = reg_list[0]
+        self.a = param_list[0]
+        self.x = param_list[1]
+        self.N = param_list[2]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
+        obj = PyQSparseOperationWrapper(
+            pysparq.Mod_Mult_UInt_ConstUInt(self.reg, self.a, self.x, self.N))
+        obj.set_dagger(dagger_ctx ^ self.dagger_flag)
+        obj.set_controller(controllers_ctx)
+        return obj
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        n = reg_sz(self.reg)
+        ncontrols = get_control_qubit_count(
+            merge_controllers(self.controllers, controllers_ctx or {}))
+        # Ripple-carry approach: 4n multi-controlled additions
+        return 4 * n * mcx_t_count(ncontrols + 2)
+
+
 class AddAssign_AnyInt_AnyInt(Primitive):
     """In-place addition: dst += src on arbitrary integer types.
 

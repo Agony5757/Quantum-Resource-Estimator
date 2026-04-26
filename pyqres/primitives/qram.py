@@ -36,7 +36,9 @@ class QRAM(Primitive):
         return pysparq.QRAMLoad(self.qram, self.reg_addr, self.reg_data)
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
-        raise NotImplementedError("QRAM t_count not yet parameterized")
+        # QRAM resources are computed independently (QRAM_Count in the future).
+        # For now, exclude from T-count estimates.
+        return 0
 
 
 class QRAMFast(Primitive):
@@ -62,4 +64,5 @@ class QRAMFast(Primitive):
         return obj
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
-        raise NotImplementedError("QRAMFast t_count not yet parameterized")
+        # QRAM resources are computed independently (QRAM_Count in the future).
+        return 0

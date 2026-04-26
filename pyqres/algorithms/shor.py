@@ -167,7 +167,7 @@ class ModMul(Primitive):
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
         obj = PyQSparseOperationWrapper(
-            ps.ModMul(self.reg, self.a, self.x, self.N))
+            ps.Mod_Mult_UInt_ConstUInt(self.reg, self.a, self.x, self.N))
         obj.set_dagger(dagger_ctx ^ self.dagger_flag)
         obj.set_controller(controllers_ctx)
         return obj

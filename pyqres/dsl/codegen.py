@@ -52,6 +52,8 @@ class CodeGenerator:
         name = defn["name"]
         has_custom_sum = defn.get("sum_t_count_formula") == "custom"
         base_class = "AbstractComposite" if has_custom_sum else "StandardComposite"
+        # Store param type map for for_each range() vs direct-iteration decisions
+        self._param_type_map = {p["name"]: p.get("type", "int") for p in defn.get("params", [])}
 
         imports = self._generate_imports(base_class)
 
@@ -328,11 +330,15 @@ class CodeGenerator:
 
             # Resolve items expression
             if isinstance(items, list):
-                # Literal list
+                # Literal list: iterate directly
                 items_expr = repr(items)
             elif isinstance(items, str):
-                # Parameter reference
-                items_expr = f"self.{items}"
+                # Parameter reference: array types iterate directly, int/float need range()
+                ptype = self._param_type_map.get(items, "int")
+                if ptype in ("array", "list"):
+                    items_expr = f"self.{items}"
+                else:
+                    items_expr = f"range(self.{items})"
             else:
                 items_expr = str(items)
 
@@ -556,7 +562,12 @@ class CodeGenerator:
         if isinstance(items, list):
             items_expr = repr(items)
         elif isinstance(items, str):
-            items_expr = f"self.{items}"
+            # Parameter reference: array types iterate directly, int/float need range()
+            ptype = self._param_type_map.get(items, "int")
+            if ptype in ("array", "list"):
+                items_expr = f"self.{items}"
+            else:
+                items_expr = f"range(self.{items})"
         else:
             items_expr = str(items)
 

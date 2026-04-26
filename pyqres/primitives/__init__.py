@@ -15,8 +15,9 @@ from .arithmetic import (
     Compare_UInt_UInt, Less_UInt_UInt, GetMid_UInt_UInt,
     Assign, Swap_General_General,
     Div_Sqrt_Arccos_Int_Int, Sqrt_Div_Arccos_Int_Int, GetRotateAngle_Int_Int,
-    # New Phase 2 arithmetic
-    Add_Mult_UInt_ConstUInt, AddAssign_AnyInt_AnyInt,
+    # Phase 2 arithmetic
+    Add_Mult_UInt_ConstUInt, Mod_Mult_UInt_ConstUInt,
+    AddAssign_AnyInt_AnyInt,
     CustomArithmetic, PlusOneAndOverflow,
     GetDataAddr, GetRowAddr,
 )
@@ -43,6 +44,8 @@ from .measurement import (
     Prob, StatePrint,
 )
 
+from .debug import DebugPrimitive, CheckNan, CheckNormalization
+
 __all__ = [
     # Gates
     "Hadamard", "Hadamard_NDigits",
@@ -59,7 +62,8 @@ __all__ = [
     "Compare_UInt_UInt", "Less_UInt_UInt", "GetMid_UInt_UInt",
     "Assign", "Swap_General_General",
     "Div_Sqrt_Arccos_Int_Int", "Sqrt_Div_Arccos_Int_Int", "GetRotateAngle_Int_Int",
-    "Add_Mult_UInt_ConstUInt", "AddAssign_AnyInt_AnyInt",
+    "Add_Mult_UInt_ConstUInt", "Mod_Mult_UInt_ConstUInt",
+    "AddAssign_AnyInt_AnyInt",
     "CustomArithmetic", "PlusOneAndOverflow",
     "GetDataAddr", "GetRowAddr",
     # Register ops
@@ -79,4 +83,6 @@ __all__ = [
     # Measurement
     "PartialTrace", "PartialTraceSelect", "PartialTraceSelectRange",
     "Prob", "StatePrint",
+    # Debug
+    "DebugPrimitive", "CheckNan", "CheckNormalization",
 ]

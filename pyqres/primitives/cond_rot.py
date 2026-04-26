@@ -8,27 +8,42 @@ from ..core.simulator import PyQSparseOperationWrapper
 class CondRot_General_Bool(Primitive):
     """Conditional rotation based on rational value register.
 
-    Applies a rotation to the target qubit based on the value in the
-    condition register, implementing amplitude embedding for state preparation.
+    Supports two forms:
+    - 2-arg: rotation determined by register value (cond_reg, target_reg)
+    - 3-arg: rotation determined by arbitrary Python function
+      (cond_reg, target_reg, angle_function)
+
+    The 3-arg form is used in block encoding UR/UL and StatePrepViaQRAM.
+    The angle_function receives the register value and returns a u22_t
+    (2x2 unitary matrix) — for now, t_count returns NotImplementedError
+    since the cost depends on the function body.
     """
-    def __init__(self, reg_list, param_list=None):
+    def __init__(self, reg_list, param_list=None, angle_function=None):
         super().__init__(reg_list, param_list)
         self.cond_reg = reg_list[0]
         self.target_reg = reg_list[1]
+        self.angle_function = angle_function
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
-        obj = PyQSparseOperationWrapper(
-            pysparq.CondRot_General_Bool(self.cond_reg, self.target_reg))
+        if self.angle_function is not None:
+            obj = PyQSparseOperationWrapper(
+                pysparq.CondRot_General_Bool(
+                    self.cond_reg, self.target_reg, self.angle_function))
+        else:
+            obj = PyQSparseOperationWrapper(
+                pysparq.CondRot_General_Bool(self.cond_reg, self.target_reg))
         obj.set_controller(controllers_ctx)
         return obj
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        if self.angle_function is not None:
+            raise NotImplementedError(
+                "CondRot_General_Bool (3-arg) t_count depends on angle_function")
         ncontrols = get_control_qubit_count(
             merge_controllers(self.controllers, controllers_ctx or {}))
         if ncontrols == 0:
-            return 0  # rotation on single qubit
-        # Controlled rotation - approximate cost
+            return 0
         return 4 * ncontrols + 3
 
 
@@ -36,7 +51,8 @@ class CondRot_General_Bool_QW(Primitive):
     """Conditional rotation for quantum walk operations.
 
     Similar to CondRot_General_Bool but optimized for quantum walk style
-    amplitude loading with 2x2 rotation matrices.
+    amplitude loading with 2x2 rotation matrices. Uses CondRot_Rational_Bool
+    internally with a matrix-structured angle function.
     """
     def __init__(self, reg_list, param_list):
         super().__init__(reg_list=reg_list, param_list=param_list)
@@ -46,13 +62,13 @@ class CondRot_General_Bool_QW(Primitive):
         self.reg_out = reg_list[3]
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
-        controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
-        # For quantum walk, we need custom angle function handling
-        # This is a placeholder - actual implementation needs SparseMatrix
-        raise NotImplementedError("CondRot_General_Bool_QW requires SparseMatrix parameter")
+        raise NotImplementedError(
+            "CondRot_General_Bool_QW: use CondRot_Rational_Bool or "
+            "CondRot_General_Bool with angle_function instead")
 
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
-        raise NotImplementedError("CondRot_General_Bool_QW t_count depends on matrix structure")
+        raise NotImplementedError(
+            "CondRot_General_Bool_QW t_count depends on matrix structure")
 
 
 class ZeroConditionalPhaseFlip(Primitive):

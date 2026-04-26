@@ -20,6 +20,6 @@ class SimpleStatePrep(StandardComposite):
     def _build_execute_method(self):
         # Build program_list by expanding loops and conditionals
         self.program_list = []
-        for i in self.range(n_qubits):
+        for i in range(self.range(n_qubits)):
                 self.program_list.append(OperationRegistry.get_class("Hadamard")(reg_list=[self.reg]))
         self.declare_program_list()

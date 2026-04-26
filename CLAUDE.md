@@ -6,7 +6,7 @@
 
 ```bash
 pip install -e .                  # 开发安装
-pytest tests/ -v                  # 运行全部 300 个测试
+pytest tests/ -v                  # 运行全部 ~296 个测试
 pytest tests/test_simulation.py   # 仅运行 PySparQ 模拟测试（需安装 pysparq，见外部依赖）
 pyqres compile                    # 编译 YAML schema → Python 代码
 pyqres check                      # 完整性检查（依赖、覆盖率）
@@ -40,6 +40,7 @@ pyqres/
 │   ├── qram.py                     # QRAM, QRAMFast（特殊原语）
 │   ├── cond_rot.py                 # CondRot_General_Bool, ZeroConditionalPhaseFlip + Phase 2: CondRot_Rational_Bool, Rot_GeneralUnitary
 │   ├── measurement.py              # Phase 2: PartialTrace, Prob, StatePrint
+│   ├── debug.py                    # DebugPrimitive, CheckNan, CheckNormalization（debug 模式运行，release 模式跳过）
 │   └── _utils.py                   # 原语共享工具
 ├── algorithms/                     # 手写算法（含复杂 sum_t_count 公式）
 │   ├── amplitude_amplification.py  # 幅度放大
@@ -50,7 +51,9 @@ pyqres/
 │   ├── block_encoding.py           # 块编码 (BlockEncodingTridiagonal, UR, UL, BlockEncodingViaQRAM, PlusOneOverflow)
 │   └── state_prep.py              # QRAM 态制备 (StatePrepViaQRAM, StatePreparation)
 ├── generated/                      # YAML 自动生成的组合操作类（不要手动编辑）
-│   └── Swap.py
+│   ├── Swap.py                    # DSL: basic.yml
+│   ├── GroverSearch.py            # DSL: grover_search.yml（完整 Oracle + Diffusion）
+│   └── ShorFactor.py              # DSL: shor_factor.yml（占位符，ExpMod 无法 DSL 表达）
 ├── lib/                            # 预定义操作库
 │   ├── arithmetic/                 # 算术操作库
 │   ├── oracles/                    # Oracle 操作库
@@ -111,8 +114,10 @@ Operation (metaclass=OperationMeta, auto-registers to OperationRegistry)
 - **原语集系统**：通过 `.primitive.yaml` 定义原语集，编译时可用 `--primitive` 选择
 - **库文件**：预定义操作放在 `pyqres/lib/`，通过 `--lib` 加载
 - **自动注册**：`OperationMeta` 元类将所有 Operation 子类注册到 `OperationRegistry`
-- **QRAM 是特殊原语**：不做 resource estimation，`t_count()` 保持不实现
-- **algorithms/ 不迁移 YAML**：含复杂数学表达式，需手写 Python 逻辑
+- **QRAM 是特殊原语**：不做 resource estimation，`t_count()` 返回 0
+- **DebugPrimitive**：继承 `Primitive`，`pyqsparse_object()` 在 debug 模式执行 pysparq 操作，`t_count()` 返回 0；子类示例：`CheckNan`、`CheckNormalization`
+- **algorithms/ 不迁移 YAML**：含复杂数学表达式，需手写 Python 逻辑（Shor 分解的 ModMul/ExpMod 需要动态循环和 Python callable，超出 DSL 表达能力）
+- **DSL for_each range() 语义**：当 `items` 引用 `type: int` 参数时自动包装为 `range()`；引用 `type: array` 参数时直接迭代
 
 ## YAML Schema 字段
 
@@ -138,6 +143,24 @@ Operation (metaclass=OperationMeta, auto-registers to OperationRegistry)
 | `name` | 是 | string | 原语集名（snake_case）|
 | `description` | 否 | string | 描述 |
 | `primitives` | 是 | array | 原语操作名列表 |
+
+### DSL for_each / loop 语义
+
+| YAML 字段 | 行为 |
+|-----------|------|
+| `loop: {iterations: N, body: [...]}` | 生成 `for i in range(N):` — 展开子操作到 program_list |
+| `for_each: {var: x, items: [1,2,3], body: [...]}` | 生成 `for x in [1, 2, 3]:` — 字面量列表 |
+| `for_each: {var: x, items: n_qubits, body: [...]}` | `type: int` 参数 → `for x in range(self.n_qubits):` |
+| `for_each: {var: x, items: angles, body: [...]}` | `type: array` 参数 → `for x in self.angles:` — 直接迭代 |
+
+### DSL 算法覆盖情况
+
+| 算法 | DSL 可表达 | 说明 |
+|------|-----------|------|
+| Grover 搜索 | ✓ 是 | Oracle（Compare + ZeroConditionalPhaseFlip）+ Diffusion（H^X^MCZX^H）|
+| Shor 分解 | ✗ 否 | ModMul 需要 `2**j` 动态幂次；ExpMod 需要 Python callable；必须手写 Python |
+| CKS 线性求解 | ✗ 否 | 依赖 Block Encoding + QRAM_Count，DSL 不支持动态循环或 Python callable |
+| 幅度放大 | ✓ 部分 | 纯 Python 子类（`amplitude_amplification.py`）含 math 表达式，DSL 可表达框架但 Grover 迭代更直接 |
 
 ## 开发约定
 
