@@ -212,7 +212,9 @@ class TestQDAHelpers:
 
 
 class TestQDABlockEncoding:
-    @pytest.mark.xfail(reason="PySparQ BlockEncoding internal memory allocation issue")
+    @pytest.mark.skip(reason="pysparq System::get_register_info dereferences end iterator when "
+                             "register 'main' not found — segfault in C++. Also: "
+                             "BlockEncodingViaQRAM.__init__ calls size_of(unknown_reg)")
     def test_block_encoding_creation(self):
         A = np.array([[2, 1], [1, 2]], dtype=float)
         b = np.array([1, 0], dtype=float)
@@ -229,7 +231,8 @@ class TestQDABlockEncoding:
             assert len(R) == 4
             assert all(isinstance(r, complex) for r in R)
 
-    @pytest.mark.xfail(reason="PySparQ BlockEncoding internal memory allocation issue")
+    @pytest.mark.skip(reason="pysparq System::get_register_info dereferences end iterator — segfault. "
+                             "test_walk_s_fs_range also calls BlockEncoding(A) which crashes.")
     def test_walk_s_fs_range(self):
         A = np.array([[2, 1], [1, 2]], dtype=float)
         b = np.array([1, 0], dtype=float)
