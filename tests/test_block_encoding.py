@@ -1,240 +1,156 @@
-"""Tests for BlockEncoding implementations in PySparQ."""
+"""Tests for block encoding algorithms (pyqres.algorithms.block_encoding)."""
 
 import pytest
 import numpy as np
-import pysparq as ps
-
-from pysparq.algorithms.block_encoding import (
-    BlockEncodingTridiagonal,
-    BlockEncodingQRAM,
-    StatePreparation,
-    BlockEncoding,
-    _is_tridiagonal,
-    _extract_tridiagonal_params,
+from pyqres.algorithms.block_encoding import (
+    get_tridiagonal_matrix, get_u_plus, get_u_minus,
+    BlockEncodingTridiagonal, UR, UL,
+    BlockEncodingViaQRAM, PlusOneOverflow,
 )
-
-
-@pytest.fixture(autouse=True)
-def clean_pysparq():
-    """Clean PySparQ state before/after each test."""
-    ps.System.clear()
-    yield
-    ps.System.clear()
-
-
-class TestBlockEncodingTridiagonal:
-    """Tests for tridiagonal block encoding."""
-
-    def test_create_tridiagonal_encoding(self):
-        """Test creating tridiagonal block encoding."""
-        alpha, beta = 0.5, 0.25
-
-        ps.System.add_register("main", ps.UnsignedInteger, 2)
-        ps.System.add_register("anc", ps.UnsignedInteger, 2)
-
-        enc = BlockEncodingTridiagonal(alpha, beta, "main", "anc")
-
-        assert enc.alpha == alpha
-        assert enc.beta == beta
-        assert len(enc.prep_state) == 4
-
-    def test_prep_state_normalization(self):
-        """Test that prep_state is normalized."""
-        enc = BlockEncodingTridiagonal(0.5, 0.25, "main", "anc")
-
-        # Sum of squares should be approximately 1
-        total = sum(abs(x) ** 2 for x in enc.prep_state)
-        assert abs(total - 1.0) < 1e-10
-
-    def test_tridiagonal_simulation(self):
-        """Test tridiagonal block encoding simulation."""
-        # anc register needs size matching prep_state (4 elements = 2 qubits)
-        ps.System.add_register("main", ps.UnsignedInteger, 2)
-        ps.System.add_register("anc", ps.UnsignedInteger, 2)
-
-        enc = BlockEncodingTridiagonal(0.5, 0.25, "main", "anc")
-        state = ps.SparseState()
-
-        # Should not raise
-        enc(state)
-        assert state.size() >= 1
-
-    def test_conditioned_by_all_ones(self):
-        """Test conditioning on register."""
-        ps.System.add_register("main", ps.UnsignedInteger, 2)
-        ps.System.add_register("anc", ps.UnsignedInteger, 2)
-        ps.System.add_register("ctrl", ps.Boolean, 1)
-
-        enc = BlockEncodingTridiagonal(0.5, 0.25, "main", "anc")
-        enc_cond = enc.conditioned_by_all_ones("ctrl")
-
-        assert enc_cond._condition_regs == ["ctrl"]
-
-    def test_edge_case_zero_alpha(self):
-        """Test edge case with zero alpha."""
-        enc = BlockEncodingTridiagonal(0.0, 0.5, "main", "anc")
-
-        assert enc.alpha == 0.0
-        assert enc.beta == 0.5
-        assert len(enc.prep_state) == 4
-
-
-class TestBlockEncodingQRAM:
-    """Tests for QRAM-based block encoding."""
-
-    def test_create_qram_encoding(self):
-        """Test creating QRAM block encoding."""
-        A = np.array([[2, 1], [1, 2]], dtype=float)
-
-        ps.System.add_register("main", ps.UnsignedInteger, 2)
-        ps.System.add_register("anc", ps.UnsignedInteger, 4)
-
-        enc = BlockEncodingQRAM(A, main_reg="main", anc_reg="anc")
-
-        assert enc.sparse_mat.n_row == 2
-
-    def test_qram_encoding_different_sizes(self):
-        """Test QRAM encoding with different matrix sizes."""
-        for n in [2, 3, 4]:
-            ps.System.clear()
-            A = np.eye(n, dtype=float)
-
-            ps.System.add_register("main", ps.UnsignedInteger, n)
-            ps.System.add_register("anc", ps.UnsignedInteger, n * 2)
-
-            enc = BlockEncodingQRAM(A, main_reg="main", anc_reg="anc")
-            assert enc.sparse_mat.n_row == n
-
-
-class TestStatePreparation:
-    """Tests for state preparation."""
-
-    def test_create_state_prep(self):
-        """Test creating state preparation."""
-        b = np.array([1.0, 1.0]) / np.sqrt(2)
-
-        # 2 elements needs 1 qubit (size 2)
-        ps.System.add_register("main", ps.UnsignedInteger, 1)
-
-        prep = StatePreparation(b, "main")
-
-        assert len(prep.prep_state) == 2
-
-    def test_state_prep_normalization(self):
-        """Test that prepared state is normalized."""
-        b = np.array([1.0, 2.0, 3.0, 4.0])  # 4 elements
-        prep = StatePreparation(b, "main")
-
-        norm = np.linalg.norm(prep.prep_state)
-        assert abs(norm - 1.0) < 1e-10
-
-    def test_state_prep_simulation(self):
-        """Test state preparation simulation."""
-        b = np.array([1.0, 1.0]) / np.sqrt(2)
-
-        # 2 elements needs 1 qubit (size 2)
-        ps.System.add_register("main", ps.UnsignedInteger, 1)
-
-        prep = StatePreparation(b, "main")
-        state = ps.SparseState()
-
-        prep(state)
-        assert state.size() >= 1
-
-    def test_state_prep_with_conditioning(self):
-        """Test conditioned state preparation."""
-        b = np.array([1.0, 1.0]) / np.sqrt(2)
-
-        # 2 elements needs 1 qubit (size 2)
-        ps.System.add_register("main", ps.UnsignedInteger, 1)
-        ps.System.add_register("ctrl", ps.Boolean, 1)
-
-        prep = StatePreparation(b, "main").conditioned_by_all_ones("ctrl")
-
-        assert prep._condition_regs == ["ctrl"]
-
-
-class TestBlockEncodingFactory:
-    """Tests for BlockEncoding factory function."""
-
-    def test_factory_tridiagonal_detection(self):
-        """Test that factory detects tridiagonal matrices."""
-        A = np.array(
-            [[2, 1, 0], [1, 2, 1], [0, 1, 2]], dtype=float
-        )
-
-        enc = BlockEncoding(A, main_reg="main", anc_reg="anc")
-
-        assert isinstance(enc, BlockEncodingTridiagonal)
-
-    def test_factory_dense_matrix(self):
-        """Test factory with dense matrix."""
-        A = np.array([[2, 1], [1, 2]], dtype=float)
-
-        enc = BlockEncoding(A, main_reg="main", anc_reg="anc")
-
-        # Should return some kind of block encoding
-        assert isinstance(enc, (BlockEncodingTridiagonal, BlockEncodingQRAM))
+from pyqres.core.operation import StandardComposite, Primitive
 
 
 class TestUtilityFunctions:
-    """Tests for utility functions."""
+    def test_get_tridiagonal_matrix(self):
+        A = get_tridiagonal_matrix(alpha=1.0, beta=0.5, dim=4)
+        assert A.shape == (4, 4)
+        assert A[0, 0] == 1.0
+        assert A[0, 1] == 0.5
+        assert A[1, 0] == 0.5
+        assert A[3, 3] == 1.0
+        assert A[3, 2] == 0.5
+        # Off-diagonal corners should be zero
+        assert A[0, 3] == 0.0
 
-    def test_is_tridiagonal_true(self):
-        """Test tridiagonal detection for tridiagonal matrix."""
-        A = np.array([[2, 1, 0], [1, 2, 1], [0, 1, 2]], dtype=float)
+    def test_get_tridiagonal_matrix_1x1(self):
+        A = get_tridiagonal_matrix(alpha=2.0, beta=0.0, dim=1)
+        assert A.shape == (1, 1)
+        assert A[0, 0] == 2.0
 
-        assert _is_tridiagonal(A) is True
+    def test_get_u_plus(self):
+        U = get_u_plus(4)
+        assert U.shape == (4, 4)
+        assert U[1, 0] == 1
+        assert U[2, 1] == 1
+        assert U[3, 2] == 1
+        assert U[0, 0] == 0
 
-    def test_is_tridiagonal_false(self):
-        """Test tridiagonal detection for non-tridiagonal matrix."""
-        A = np.array([[2, 1, 1], [1, 2, 1], [0, 1, 2]], dtype=float)
-
-        assert _is_tridiagonal(A) is False
-
-    def test_extract_tridiagonal_params(self):
-        """Test extracting tridiagonal parameters."""
-        A = np.array([[2, 1, 0], [1, 2, 1], [0, 1, 2]], dtype=float)
-
-        alpha, beta = _extract_tridiagonal_params(A)
-
-        assert alpha == 2.0
-        assert beta == 1.0
+    def test_get_u_minus(self):
+        U = get_u_minus(4)
+        assert U.shape == (4, 4)
+        assert U[0, 1] == 1
+        assert U[1, 2] == 1
+        assert U[2, 3] == 1
+        assert U[3, 3] == 0
 
 
-class TestPySparQCompatibility:
-    """Tests verifying compatibility with PySparQ."""
+class TestPlusOneOverflow:
+    def test_is_primitive(self):
+        assert issubclass(PlusOneOverflow, Primitive)
 
-    def test_import_from_pysparq(self):
-        """Test that imports work from pysparq.algorithms."""
-        from pysparq.algorithms import BlockEncoding, StatePreparation
+    def test_not_self_conjugate(self):
+        # PlusOneOverflow with cond_value=1 is NOT the same as cond_value=2
+        assert getattr(PlusOneOverflow, '__self_conjugate__', True) is False
 
-        assert BlockEncoding is not None
-        assert StatePreparation is not None
+    def test_dagger_flips_condition(self):
+        from pyqres.core.metadata import RegisterMetadata
+        RegisterMetadata.get_register_metadata().declare_register('main', 4)
+        RegisterMetadata.get_register_metadata().declare_register('overflow', 1)
 
-    def test_cks_solver_imports(self):
-        """Test that CKS solver components can be imported."""
-        from pysparq.algorithms.cks_solver import (
-            ChebyshevPolynomialCoefficient,
-            SparseMatrix,
+        forward = PlusOneOverflow(
+            reg_list=['main', 'overflow'], param_list=[1])
+        backward = forward.dagger()
+
+        assert backward.cond_value == 2
+        assert backward.main_reg == 'main'
+        assert backward.overflow_reg == 'overflow'
+
+    def test_t_count(self):
+        from pyqres.core.metadata import RegisterMetadata
+        RegisterMetadata.get_register_metadata().declare_register('main', 4)
+        RegisterMetadata.get_register_metadata().declare_register('overflow', 1)
+
+        op = PlusOneOverflow(
+            reg_list=['main', 'overflow'], param_list=[1])
+        tc = op.t_count()
+        # Ripple-carry: 4 * n = 4 * 4 = 16
+        assert tc == 16
+
+
+class TestBlockEncodingTridiagonal:
+    def test_is_standard_composite(self):
+        assert issubclass(BlockEncodingTridiagonal, StandardComposite)
+
+    def test_builds_program_list(self):
+        from pyqres.core.metadata import RegisterMetadata
+        RegisterMetadata.get_register_metadata().declare_register('main', 2)
+        RegisterMetadata.get_register_metadata().declare_register('anc', 2)
+
+        be = BlockEncodingTridiagonal(
+            main_reg='main', anc_UA='anc',
+            alpha=1.0, beta=0.5,
         )
+        assert len(be.program_list) > 0
 
-        cheb = ChebyshevPolynomialCoefficient(10)
-        assert cheb.b == 10
+    def test_prep_state_length_4(self):
+        from pyqres.core.metadata import RegisterMetadata
+        RegisterMetadata.get_register_metadata().declare_register('main', 2)
+        RegisterMetadata.get_register_metadata().declare_register('anc', 2)
 
-        A = np.array([[1, 2], [2, 1]])
-        mat = SparseMatrix.from_dense(A, data_size=8)
-        assert mat.n_row == 2
-
-    def test_qda_solver_imports(self):
-        """Test that QDA solver components can be imported."""
-        from pysparq.algorithms.qda_solver import (
-            compute_fs,
-            compute_rotation_matrix,
+        be = BlockEncodingTridiagonal(
+            main_reg='main', anc_UA='anc',
+            alpha=1.0, beta=0.5,
         )
+        assert len(be.prep_state) == 4
+        # State vector should have valid complex numbers
+        for v in be.prep_state:
+            assert isinstance(v, complex)
 
-        fs = compute_fs(0.5, 10.0, 0.5)
-        assert 0 <= fs <= 1
+    def test_prep_state_normalized(self):
+        from pyqres.core.metadata import RegisterMetadata
+        RegisterMetadata.get_register_metadata().declare_register('main', 2)
+        RegisterMetadata.get_register_metadata().declare_register('anc', 2)
 
-        R = compute_rotation_matrix(0.5)
-        assert len(R) == 4
+        be = BlockEncodingTridiagonal(
+            main_reg='main', anc_UA='anc',
+            alpha=1.0, beta=0.5,
+        )
+        norm_sq = sum(abs(v) ** 2 for v in be.prep_state)
+        assert abs(norm_sq - 1.0) < 1e-10
+
+
+class TestUR:
+    def test_is_standard_composite(self):
+        assert issubclass(UR, StandardComposite)
+
+    def test_builds_program_list(self):
+        from pyqres.core.metadata import RegisterMetadata
+        RegisterMetadata.get_register_metadata().declare_register('col', 3)
+
+        ur = UR(
+            column_index='col',
+            data_size=8,
+            rational_size=4,
+            qram=None,
+        )
+        assert len(ur.program_list) > 0
+        assert ur.addr_size == 3
+
+
+class TestUL:
+    def test_is_standard_composite(self):
+        assert issubclass(UL, StandardComposite)
+
+    def test_builds_program_list(self):
+        from pyqres.core.metadata import RegisterMetadata
+        RegisterMetadata.get_register_metadata().declare_register('row', 3)
+
+        ul = UL(
+            row_index='row',
+            column_index='col',
+            data_size=8,
+            rational_size=4,
+            qram=None,
+        )
+        assert len(ul.program_list) > 0
+        assert ul.addr_size == 3

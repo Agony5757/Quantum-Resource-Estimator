@@ -146,12 +146,152 @@ class TestUtils:
         assert mcx_t_count(3) == 16 * 7 * 3
 
 
+class TestNewGates:
+    """Tests for Phase 2 gate primitives."""
+
+    def test_hadamard_bool_is_primitive(self):
+        from pyqres.primitives import Hadamard_Bool
+        assert issubclass(Hadamard_Bool, Primitive)
+
+    def test_hadamard_bool_t_count(self):
+        from pyqres.primitives import Hadamard_Bool
+        declare_regs(b0=1)
+        h = Hadamard_Bool(['b0'])
+        assert h.t_count() == 0
+        assert getattr(h, '__self_conjugate__', False)
+
+    def test_sgate_t_count(self):
+        from pyqres.primitives import Sgate
+        declare_regs(b0=1)
+        s = Sgate(['b0'], [0])
+        assert s.t_count() == 0
+
+    def test_tgate_t_count(self):
+        from pyqres.primitives import Tgate
+        declare_regs(b0=1)
+        t = Tgate(['b0'], [0])
+        # T gate uses rotation decomposition
+        assert t.t_count() > 0
+
+    def test_sxgate_t_count(self):
+        from pyqres.primitives import SXgate
+        declare_regs(b0=1)
+        sx = SXgate(['b0'], [0])
+        assert sx.t_count() > 0
+
+    def test_u2gate_t_count(self):
+        from pyqres.primitives import U2gate
+        declare_regs(b0=1)
+        u2 = U2gate(['b0'], [0, 0.5, 1.0])
+        assert u2.t_count() > 0
+
+    def test_swap_bool_bool_t_count(self):
+        from pyqres.primitives import Swap_Bool_Bool
+        declare_regs(b0=1, b1=1)
+        sw = Swap_Bool_Bool(['b0', 'b1'], [0, 1])
+        assert sw.t_count() == 0
+        assert getattr(sw, '__self_conjugate__', False)
+
+    def test_global_phase_t_count(self):
+        from pyqres.primitives import GlobalPhase
+        gp = GlobalPhase([], [0.5])
+        assert gp.t_count() == 0
+
+
+class TestNewArithmetic:
+    """Tests for Phase 2 arithmetic primitives."""
+
+    def test_add_mult_uint_constuint_t_count(self):
+        from pyqres.primitives import Add_Mult_UInt_ConstUInt
+        declare_regs(input_reg=4, output_reg=4)
+        op = Add_Mult_UInt_ConstUInt(['input_reg', 'output_reg'], [3, 0])
+        assert op.t_count() >= 0
+
+    def test_get_data_addr_t_count(self):
+        from pyqres.primitives import GetDataAddr
+        declare_regs(offset=4, row=4, col=4, data_offset=4)
+        op = GetDataAddr(['offset', 'row', 'col', 'data_offset'], [8])
+        # Self-adjoint (XOR-based)
+        assert getattr(op, '__self_conjugate__', False)
+        assert op.t_count() >= 0
+
+    def test_get_row_addr_t_count(self):
+        from pyqres.primitives import GetRowAddr
+        declare_regs(offset=4, row=4, row_offset=4)
+        op = GetRowAddr(['offset', 'row', 'row_offset'], [8])
+        assert getattr(op, '__self_conjugate__', False)
+        assert op.t_count() >= 0
+
+
+class TestNewRegisterOps:
+    """Tests for Phase 2 register management primitives."""
+
+    def test_add_register_t_count(self):
+        from pyqres.primitives import AddRegister
+        ar = AddRegister([], ['new_reg', 'UnsignedInteger', 4])
+        assert ar.t_count() == 0
+
+    def test_remove_register_t_count(self):
+        from pyqres.primitives import RemoveRegister
+        rr = RemoveRegister([], ['old_reg'])
+        assert rr.t_count() == 0
+
+
+class TestMeasurement:
+    """Tests for measurement primitives."""
+
+    def test_partial_trace_t_count(self):
+        from pyqres.primitives import PartialTrace
+        pt = PartialTrace(['reg1', 'reg2'])
+        assert pt.t_count() == 0
+        assert getattr(pt, '__self_conjugate__', False)
+
+    def test_prob_t_count(self):
+        from pyqres.primitives import Prob
+        p = Prob(['reg1'])
+        assert p.t_count() == 0
+        assert getattr(p, '__self_conjugate__', False)
+
+    def test_state_print_t_count(self):
+        from pyqres.primitives import StatePrint
+        sp = StatePrint(['reg1'], [0])
+        assert sp.t_count() == 0
+        assert getattr(sp, '__self_conjugate__', False)
+
+
+class TestNewCondRot:
+    """Tests for Phase 2 conditional rotation primitives."""
+
+    def test_condrot_rational_bool_t_count(self):
+        from pyqres.primitives import CondRot_Rational_Bool
+        declare_regs(reg_in=4, reg_out=1)
+        op = CondRot_Rational_Bool(['reg_in', 'reg_out'])
+        assert getattr(op, '__self_conjugate__', False)
+        result = op.t_count()
+        assert result >= 0
+
+
+class TestViewNormalization:
+    """Tests for ViewNormalization."""
+
+    def test_view_normalization_t_count(self):
+        from pyqres.primitives import ViewNormalization
+        vn = ViewNormalization([])
+        assert vn.t_count() == 0
+        assert getattr(vn, '__self_conjugate__', False)
+
+
 class TestRegistry:
     def test_primitives_registered(self):
         assert OperationRegistry.has_class("Hadamard")
         assert OperationRegistry.has_class("X")
         assert OperationRegistry.has_class("CNOT")
         assert OperationRegistry.has_class("Toffoli")
+        # New primitives should be registered
+        assert OperationRegistry.has_class("Hadamard_Bool")
+        assert OperationRegistry.has_class("CondRot_Rational_Bool")
+        assert OperationRegistry.has_class("GetDataAddr")
+        assert OperationRegistry.has_class("PartialTrace")
 
     def test_get_class(self):
         cls = OperationRegistry.get_class("Hadamard")

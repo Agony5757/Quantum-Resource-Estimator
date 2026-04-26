@@ -1,60 +1,79 @@
-# Shor's Quantum Factorization Algorithm
-# Semi-classical version with iterative phase estimation
-# Time complexity: O(poly(log N)) - exponential speedup over classical
+# Shor's Quantum Factorization Algorithm (Quantum Phase Estimation variant)
+#
+# Full circuit:
+#   |0⟩^(n) --H--> |+⟩^(n) --ExpMod--> |phase⟩ --IQFT--> |r⟩  →  classical continued fractions → factors
+#
+# Components:
+#   - Hadamard: superposition on work register
+#   - ExpMod: |x⟩|0⟩ → |x⟩|a^x mod N⟩  (via CustomArithmetic — not DSL-expressible)
+#   - InverseQFT: extracts the phase register value
+#
+# DSL scope notes:
+#   ─────────────────────────────────────────────────────────────────────────────
+#   The modular exponentiation ExpMod = ∏_{j=0}^{precision-1} ModMul(a, 2^j, N)
+#   requires dynamic loop bounds (ModMul power = 2**j computed per iteration).
+#   This CANNOT be expressed in DSL because:
+#     1. DSL `loop:` requires a static iteration count, but the inner ModMul
+#        power (2**j) is data-dependent per iteration.
+#     2. The ExpMod function a^x mod N requires a Python callable (CustomArithmetic),
+#        which DSL cannot express (no `python:` blocks in composite schemas).
+#   ─────────────────────────────────────────────────────────────────────────────
+#   To express Shor in DSL, the algorithm must be written as a Python class
+#   (e.g., pyqres/algorithms/shor.py: Shor / SemiClassicalShor).
+#   This schema is a documented STUB showing the ideal circuit structure.
+#   ─────────────────────────────────────────────────────────────────────────────
+#
+# What IS DSL-expressible here:
+#   - Hadamard(work_reg)          ✓
+#   - InverseQFT(work_reg)        ✓
+#   - Init_Unsafe registers        ✓
+#
+# What is NOT DSL-expressible (placeholder blocks marked with ⚠):
+#   - Controlled ModMul: requires 2^j power (dynamic per iteration)
+#   - ExpMod CustomArithmetic: requires Python callable
 
 name: ShorFactor
-description: "Shor's quantum factorization algorithm (semi-classical version)"
+description: "Shor factorization stub — see notes: ExpMod/ModMul require Python (not DSL-expressible)"
 qregs:
-  - {name: anc_reg, type: UnsignedInteger, desc: "Ancilla register for modular arithmetic"}
-  - {name: work_reg, type: General, desc: "Work register for phase estimation"}
+  - {name: work_reg, type: General, desc: "Phase-estimation register (Hadamard → measure)"}
+  - {name: anc_reg, type: UnsignedInteger, desc: "Ancilla register for modular arithmetic output"}
 params:
-  - {name: N, type: int, desc: "Integer to factor"}
-  - {name: a, type: int, desc: "Random base coprime to N"}
+  - {name: N, type: int, desc: "Integer to factor (N ≥ 4, not prime power)"}
+  - {name: a, type: int, desc: "Random base coprime to N (gcd(a, N) = 1)"}
 computed_params:
   - name: n_qubits
     formula: "int(math.log2(N)) + 1"
   - name: precision
-    formula: "self.n_qubits * 2"
+    formula: "n_qubits * 2"
 temp_regs:
-  - {name: measure_reg, size: 1}
+  - {name: measure_flag, size: 1, desc: "Temporary flag for semi-classical measurement"}
 impl:
-  # Initialize ancilla register to |1⟩
-  - comment: "Initialize ancilla to |1⟩"
-    op: X
-    qregs:
-      - anc_reg
+  # ── Initialize ────────────────────────────────────────────────────────────────
+  - comment: "Initialize ancilla to |1⟩ (required for ModMul base)"
+    op: Init_Unsafe
+    qregs: [anc_reg]
+    params: [1]
 
-  # Iterative phase estimation
-  - comment: "Iterative phase estimation"
-    loop:
-      iterations: precision
-      body:
-        # Add work qubit with Hadamard
-        - op: Hadamard
-          qregs:
-            - work_reg
+  # ── Quantum Phase Estimation ────────────────────────────────────────────────
+  - comment: "Step 1: Hadamard superposition on work register"
+    op: Hadamard_NDigits
+    qregs: [work_reg]
+    params: [precision]
 
-        # Controlled modular multiplication (placeholder)
-        - comment: "Modular multiplication (requires CustomArithmetic)"
-          op: Init_Unsafe
-          qregs:
-            - work_reg
-          params: [0]
-          controllers:
-            all_ones:
-              - anc_reg
+  # ⚠ Placeholder: ExpMod(work_reg, anc_reg) using CustomArithmetic
+  # DSL cannot express this because a^x mod N requires a Python callable.
+  # Replace with: Shor.ExpMod(...) in the Python implementation.
+  - comment: "⚠ MODULAR EXPONENTIATION (NOT DSL-EXPRESSIBLE)"
+    op: Init_Unsafe
+    qregs: [anc_reg]
+    params: [0]
+    controllers:
+      all_ones:
+        - work_reg
 
-        # Phase correction from previous measurements
-        - comment: "Phase correction (simplified)"
-          op: PhaseGate
-          qregs:
-            - work_reg
-          params: [1.570796, 0.01]
-
-        # Measure work qubit (simplified - just flip)
-        - comment: "Measurement (simplified)"
-          op: X
-          qregs:
-            - work_reg
+  # ── Inverse QFT (extract phase) ─────────────────────────────────────────────
+  - comment: "Step 3: Inverse QFT to extract phase register value"
+    op: InverseQFT
+    qregs: [work_reg]
 
 sum_t_count_formula: custom

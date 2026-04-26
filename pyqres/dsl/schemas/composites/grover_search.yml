@@ -1,58 +1,99 @@
-# Grover Search Algorithm
-# Quantum search using amplitude amplification
-# Iterates Oracle + Diffusion O(sqrt(N)) times
+# Grover's Quantum Search Algorithm
+#
+# Full implementation: Oracle (comparison-based) + Diffusion operator.
+#
+# Algorithm (per iteration):
+#   Oracle:  Compare search_reg == target  →  set equal_flag=1  →  ZeroConditionalPhaseFlip(flag=0)  →  phase flip on match
+#   Diffusion:  H^(⊗n) → X^(⊗n) → MCZ → X^(⊗n) → H^(⊗n)  (reflection about |0⟩ mean)
+#
+# Grover iteration count: π/4 * sqrt(N)  (≈ sqrt(N) for large N)
+#
+# DSL scope notes:
+#   - The target value is a DSL parameter (statically known at construction).
+#     For a dynamic oracle, subclass the generated class and override _build_execute_method.
+#   - T-count formula is custom because it depends on n_qubits at runtime.
 
 name: GroverSearch
-description: "Grover search with oracle and diffusion operator"
+description: "Grover search: Oracle (Compare+ZeroConditionalPhaseFlip) + Diffusion operator"
 qregs:
-  - {name: addr_reg, type: UnsignedInteger}
-  - {name: data_reg, type: UnsignedInteger}
-  - {name: search_data_reg, type: UnsignedInteger}
-params:
-  - {name: n_qubits, type: int}
-  - {name: n_repeats, type: int}
+  - {name: search_reg, type: UnsignedInteger, desc: "Register holding search space"}
+  - {name: target_reg, type: UnsignedInteger, desc: "Register holding target value for comparison"}
 temp_regs:
-  - {name: flag, size: 1}
-computed_params:
-  - name: addr_size
-    formula: "n_qubits"
+  - {name: less_flag, size: 1, desc: "Temp: Compare result (less-than)"}
+  - {name: equal_flag, size: 1, desc: "Temp: Compare result (equal)"}
+params:
+  - {name: n_qubits, type: int, desc: "Number of qubits in search_reg (log2 of search space size)"}
+  - {name: n_repeats, type: int, desc: "Number of Grover iterations (ceil(π/4 * sqrt(2^n_qubits)))"}
+  - {name: target_value, type: int, desc: "Target value to search for (0 ≤ target_value < 2^n_qubits)"}
 impl:
-  # Initialize with Hadamard on address register
+  # Initialize superposition: |0⟩ → H^(⊗n) → |+⟩^(⊗n)
   - op: Hadamard_NDigits
-    qregs: [addr_reg]
+    qregs: [search_reg]
     params: [n_qubits]
 
-  # Grover iteration (repeat n_repeats times)
-  - comment: "Oracle application - QRAM-based oracle marks target"
+  # Initialize target register to the search value
+  - comment: "Load target value into target_reg for comparison"
+    op: Init_Unsafe
+    qregs: [target_reg]
+    params: [target_value]
+
+  # Grover iteration loop
+  - comment: "Grover iterations: Oracle + Diffusion"
     loop:
       iterations: n_repeats
       body:
-        # Grover Oracle: flip phase of target state using QRAM
-        - op: QRAM
-          qregs: [addr_reg, data_reg]
+        # ── Oracle: flip phase of |target⟩ ──────────────────────────────────────
+        - comment: "Reset comparison flags to |0⟩"
+          op: Init_Unsafe
+          qregs: [less_flag]
           params: [0]
 
-        # HPH Diffusion operator
-        - op: Hadamard_NDigits
-          qregs: [addr_reg]
-          params: [n_qubits]
-
-        # Phase flip on |0...0>
-        - op: X
-          qregs: [addr_reg]
-
-        - op: CNOT
-          qregs: [addr_reg, flag]
-
-        - op: X
-          qregs: [addr_reg]
-
-        - op: Hadamard_NDigits
-          qregs: [addr_reg]
-          params: [n_qubits]
-
-        # Uncompute QRAM
-        - op: QRAM
-          qregs: [addr_reg, data_reg]
+        - op: Init_Unsafe
+          qregs: [equal_flag]
           params: [0]
-          dagger: true
+
+        - comment: "Compare search_reg == target_reg; sets equal_flag=1 if match"
+          op: Compare_UInt_UInt
+          qregs: [search_reg, target_reg, less_flag, equal_flag]
+
+        - comment: "Flip phase when equal_flag=0 (i.e., match was found); equivalent to Z on |target⟩"
+          op: ZeroConditionalPhaseFlip
+          qregs: [equal_flag]
+
+        # ── Diffusion operator: 2|0⟩⟨0| - I  ─────────────────────────────────
+        # H^(⊗n)  (change to computational basis)
+        - op: Hadamard_NDigits
+          qregs: [search_reg]
+          params: [n_qubits]
+
+        # X^(⊗n)  (flip all qubits)
+        - comment: "Diffusion: X on all qubits"
+          for_each:
+            var: i
+            items: n_qubits
+            body:
+              - op: X
+                qregs: [search_reg]
+                params: [$i]
+
+        # MCZ: multi-controlled Z (reflection about |0⟩)
+        - comment: "Diffusion: phase flip on |11…1⟩"
+          op: ZeroConditionalPhaseFlip
+          qregs: [search_reg]
+
+        # X^(⊗n) again  (restore)
+        - comment: "Diffusion: X on all qubits (restore)"
+          for_each:
+            var: i
+            items: n_qubits
+            body:
+              - op: X
+                qregs: [search_reg]
+                params: [$i]
+
+        # H^(⊗n)  (back to amplitude basis)
+        - op: Hadamard_NDigits
+          qregs: [search_reg]
+          params: [n_qubits]
+
+sum_t_count_formula: custom
