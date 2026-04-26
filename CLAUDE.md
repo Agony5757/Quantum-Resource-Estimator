@@ -7,7 +7,7 @@
 ```bash
 pip install -e .                  # 开发安装
 pytest tests/ -v                  # 运行全部 300 个测试
-pytest tests/test_simulation.py   # 仅运行 PySparQ 模拟测试（需安装 PySparQ）
+pytest tests/test_simulation.py   # 仅运行 PySparQ 模拟测试（需安装 pysparq，见外部依赖）
 pyqres compile                    # 编译 YAML schema → Python 代码
 pyqres check                      # 完整性检查（依赖、覆盖率）
 pyqres show <operation> --depth 3 # 显示操作依赖树
@@ -145,18 +145,52 @@ Operation (metaclass=OperationMeta, auto-registers to OperationRegistry)
 - 生成的代码写入 `pyqres/generated/`，不要手动编辑（由 `pyqres compile` 生成）
 - 新增原语操作：在 `primitives/` 手写类，实现 `pyqsparse_object()` 和 `t_count()`
 - 新增组合操作：在 `dsl/schemas/composites/` 添加 YAML，然后运行 `pyqres compile`
-- 模拟测试需要安装 PySparQ（`pip install pysparq`），其他测试通过 conftest mock 运行
+- 模拟测试需要安装 pysparq（`pip install git+https://github.com/Agony5757/QRAM-Simulator.git@main`），其他测试通过 conftest mock 运行
 - `t_count()` 返回 `NotImplementedError` 的是占位符，待后续填充
 
 ## 外部依赖
 
-- **PySparQ** (`pysparq` on PyPI)：C++ 量子稀疏态模拟器，CI 自动构建，本地开发可省略
+- **PySparQ** (`pysparq`)：C++ 量子稀疏态模拟器，从 fork 安装：
+  `pip install git+https://github.com/Agony5757/QRAM-Simulator.git@main`
+  CI 自动构建；本地开发非必需（`conftest.py` 自动 mock）
 - **quantikz2**：LaTeX 包，生成线路图需系统安装 `pdflatex`
 - **运行时依赖**：numpy, lark, sympy, pyyaml
 
-## 已知 PySparQ API 陷阱
+## QRAM-Simulator / PySparQ API 参考
 
-- 单比特 X 门用 `pysparq.Xgate_Bool(reg, digit)`，不是 `FlipBool`
-- 多比特翻转用 `pysparq.FlipBools(reg)`，参数是字符串不是列表
+本项目 fork 自 [IAI-USTC-Quantum/QRAM-Simulator](https://github.com/IAI-USTC-Quantum/QRAM-Simulator)，由 Agony5757 fork 托管。
+
+### QRAMCircuit_qutrit 构造函数
+
+```python
+# 无 memory：单独创建地址和数据寄存器后配合 QRAMLoad 使用
+qram = ps.QRAMCircuit_qutrit(addr_size, data_size)
+
+# 带 memory：一步初始化，memory 必须是 Python list/tuple（不接受 numpy array）
+qram = ps.QRAMCircuit_qutrit(addr_size, data_size, [i * 2 for i in range(16)])
+```
+
+`QRAMLoad(qram, "addr", "data")(state)` 将 `|addr⟩|0⟩ → |addr⟩|memory[addr]⟩`。
+
+### 寄存器级别编程核心操作
+
+```python
+state = ps.SparseState()
+addr_id = ps.AddRegister("addr", ps.UnsignedInteger, 4)(state)
+data_id = ps.AddRegister("data", ps.UnsignedInteger, 8)(state)
+
+# 叠加态（Hadamard 作用于整个寄存器）
+ps.Hadamard_Int("addr", 4)(state)
+
+# 打印状态（Detail=1, Binary=2, Prob=4，可 OR 组合）
+ps.StatePrint(state, mode=ps.StatePrintDisplay.Detail | ps.StatePrintDisplay.Prob)
+```
+
+### 已知 PySparQ API 陷阱
+
+- 单比特 X 门用 `ps.Xgate_Bool(reg, digit)`，不是 `FlipBool`
+- 多比特翻转用 `ps.FlipBools(reg)`，参数是寄存器名字符串，不是列表
 - 算术操作要求 `UnsignedInteger` 类型寄存器，`General` 类型会抛 ValueError
 - Compare/Less 的标志寄存器需要 `Boolean` 类型
+- `QRAMCircuit_qutrit(addr_size, data_size, memory)` 中 `memory` 必须是 Python `list`/`tuple`，不接受 numpy array（C++ 层抛出 `ValueError: Invalid input`）
+- pysparq 内部 `cks_solver.py` 依赖 `QRAMCircuit_qutrit.address_size` 属性（当前不存在），`test_algorithms_e2e.py` 中的 CKS 测试已 skip
