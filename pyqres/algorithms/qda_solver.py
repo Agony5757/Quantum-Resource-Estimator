@@ -31,7 +31,7 @@ from typing import Callable, List, Optional, Tuple, Union
 import numpy as np
 
 import pysparq as ps
-from pysparq.algorithms.block_encoding import BlockEncodingTridiagonal, BlockEncodingViaQRAM
+from pysparq.algorithms import BlockEncodingTridiagonal, BlockEncodingViaQRAM
 from pysparq.algorithms.state_preparation import StatePreparation as PS_StatePreparation
 
 from ..core.operation import AbstractComposite, Composite
