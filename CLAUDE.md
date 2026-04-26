@@ -168,20 +168,20 @@ Operation (metaclass=OperationMeta, auto-registers to OperationRegistry)
 - 生成的代码写入 `pyqres/generated/`，不要手动编辑（由 `pyqres compile` 生成）
 - 新增原语操作：在 `primitives/` 手写类，实现 `pyqsparse_object()` 和 `t_count()`
 - 新增组合操作：在 `dsl/schemas/composites/` 添加 YAML，然后运行 `pyqres compile`
-- 模拟测试需要安装 pysparq（`pip install git+https://github.com/Agony5757/QRAM-Simulator.git@main`），其他测试通过 conftest mock 运行
+- 模拟测试需要安装 pysparq（`pip install git+https://github.com/IAI-USTC-Quantum/QRAM-Simulator.git@main`），其他测试通过 conftest mock 运行
 - `t_count()` 返回 `NotImplementedError` 的是占位符，待后续填充
 
 ## 外部依赖
 
 - **PySparQ** (`pysparq`)：C++ 量子稀疏态模拟器，从 fork 安装：
-  `pip install git+https://github.com/Agony5757/QRAM-Simulator.git@main`
+  `pip install git+https://github.com/IAI-USTC-Quantum/QRAM-Simulator.git@main`
   CI 自动构建；本地开发非必需（`conftest.py` 自动 mock）
 - **quantikz2**：LaTeX 包，生成线路图需系统安装 `pdflatex`
 - **运行时依赖**：numpy, lark, sympy, pyyaml
 
 ## QRAM-Simulator / PySparQ API 参考
 
-本项目 fork 自 [IAI-USTC-Quantum/QRAM-Simulator](https://github.com/IAI-USTC-Quantum/QRAM-Simulator)，由 Agony5757 fork 托管。
+本项目使用 [IAI-USTC-Quantum/QRAM-Simulator](https://github.com/IAI-USTC-Quantum/QRAM-Simulator) 作为 PySparQ C++ 模拟器后端。
 
 ### QRAMCircuit_qutrit 构造函数
 
