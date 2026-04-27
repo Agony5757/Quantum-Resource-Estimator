@@ -34,7 +34,7 @@ from pysparq.algorithms.qda_solver import BlockEncodingHs, BlockEncodingHsPD, Wa
 
 # Import PySparQ solver functions (they use pysparq.algorithms internally)
 from pysparq.algorithms.cks_solver import (
-    cks_solve,
+    cks_solve_v2,
     ChebyshevPolynomialCoefficient as PS_Chebyshev,
 )
 from pysparq.algorithms.qda_solver import (
@@ -138,7 +138,7 @@ class TestCKSSolve:
         """Test CKS solve with simple 2x2 system."""
         A = np.array([[2, 1], [1, 2]], dtype=float)
         b = np.array([1, 1], dtype=float)
-        x = cks_solve(A, b, eps=0.1)
+        x = cks_solve_v2(A, b, eps=0.1)
         assert x is not None
         np.testing.assert_allclose(A @ x, b, atol=1e-6)
 
@@ -147,7 +147,7 @@ class TestCKSSolve:
         """Test CKS solve with 3x3 system."""
         A = np.array([[4, 1, 0], [1, 4, 1], [0, 1, 4]], dtype=float)
         b = np.array([1, 2, 1], dtype=float)
-        x = cks_solve(A, b, eps=0.1)
+        x = cks_solve_v2(A, b, eps=0.1)
         np.testing.assert_allclose(A @ x, b, atol=1e-6)
 
 
