@@ -216,4 +216,4 @@ ps.StatePrint(state, mode=ps.StatePrintDisplay.Detail | ps.StatePrintDisplay.Pro
 - 算术操作要求 `UnsignedInteger` 类型寄存器，`General` 类型会抛 ValueError
 - Compare/Less 的标志寄存器需要 `Boolean` 类型
 - `QRAMCircuit_qutrit(addr_size, data_size, memory)` 中 `memory` 必须是 Python `list`/`tuple`，不接受 numpy array（C++ 层抛出 `ValueError: Invalid input`）
-- pysparq 内部 `cks_solver.py` 依赖 `QRAMCircuit_qutrit.address_size` 属性（当前不存在），`test_algorithms_e2e.py` 中的 CKS 测试已 skip
+- pysparq `cks_solver.cks_solve`（已 deprecated）使用 `QRAMCircuit_qutrit` 有 C++ fatal error；测试改用 `cks_solve_v2`（推荐版本，古典 fallback）
