@@ -6,7 +6,7 @@ from ..core.utils import merge_controllers
 import math
 
 class SimpleBlockEncoding(AbstractComposite):
-    """Simple block encoding placeholder for resource estimation"""
+    """Minimal block encoding placeholder for basic resource estimation"""
     def __init__(self, reg_list, param_list=None):
         if param_list is None:
             param_list = []

@@ -55,7 +55,7 @@ class CodeGenerator:
         # Store param type map for for_each range() vs direct-iteration decisions
         self._param_type_map = {p["name"]: p.get("type", "int") for p in defn.get("params", [])}
 
-        imports = self._generate_imports(base_class)
+        imports = self._generate_imports(base_class, defn)
 
         # Extract dependencies from impl
         dependencies = []
@@ -104,12 +104,30 @@ class CodeGenerator:
             dependencies=dependencies
         )
 
-    def _generate_imports(self, base_class: str) -> List[str]:
-        """Generate import statements for the generated file."""
+    def _generate_imports(self, base_class: str, defn: Dict[str, Any] = None) -> List[str]:
+        """Generate import statements for the generated file.
+
+        Args:
+            base_class: Base class (StandardComposite, AbstractComposite)
+            defn: YAML definition dict (used to detect needed imports)
+        """
         imports = [imp.format(base_class=base_class) for imp in self.STANDARD_IMPORTS]
 
-        # Add math import if needed for computed_params formulas
-        # Check if any formula contains functions like log2, ceil, sqrt, etc.
+        # Add pysparq import if any param uses qram type
+        if defn:
+            for param in defn.get("params", []):
+                if isinstance(param, dict) and param.get("type") == "qram":
+                    if "import pysparq as ps" not in imports:
+                        imports.append("import pysparq as ps")
+                    break
+            # Add callable imports based on referenced function names
+            for param in defn.get("params", []):
+                if isinstance(param, dict) and param.get("type") == "callable":
+                    func_name = param.get("name", "")
+                    if func_name in ("make_func", "make_func_inv"):
+                        if "from ..algorithms.state_prep import make_func, make_func_inv" not in imports:
+                            imports.append("from ..algorithms.state_prep import make_func, make_func_inv")
+
         return imports
 
     def _generate_init(self, defn: Dict[str, Any], base_class: str = "StandardComposite") -> List[str]:
@@ -290,10 +308,11 @@ class CodeGenerator:
         # Handle python code blocks - insert code directly
         if "python" in call:
             python_code = call["python"]
-            # Handle multi-line code
+            # Handle multi-line code, substituting $self references
             code_lines = python_code.strip().split("\n")
             for code_line in code_lines:
-                lines.append(f"{prefix}{code_line}")
+                resolved = self._resolve_python_block_line(code_line, param_names, local_vars)
+                lines.append(f"{prefix}{resolved}")
             return
 
         if "loop" in call:
@@ -634,6 +653,40 @@ class CodeGenerator:
         elif isinstance(ref, list):
             items = ", ".join(self._resolve_param_ref(item, param_names, local_vars) for item in ref)
             return f"[{items}]"
+        elif isinstance(ref, dict):
+            # New complex param types
+            ptype = ref.get("type")
+            if ptype == "callable":
+                # {"type": "callable", "name": "make_func"}
+                # Returns the Python symbol name (imported separately by _generate_imports)
+                return ref.get("name", "make_func")
+            elif ptype == "op_instance":
+                # {"type": "op_instance", "name": "GroverOracle", "args": [...]}
+                op_name = ref.get("name", "")
+                args = ref.get("args", [])
+                if args:
+                    args_str = ", ".join(
+                        self._resolve_param_ref(a, param_names, local_vars)
+                        for a in args
+                    )
+                    return f'OperationRegistry.get_class("{op_name}")({args_str})'
+                return f'OperationRegistry.get_class("{op_name}")()'
+            elif ptype == "qram":
+                # {"type": "qram", "addr_size": int, "data_size": int, "memory": list}
+                addr = ref.get("addr_size", 0)
+                data = ref.get("data_size", 0)
+                mem = ref.get("memory", [])
+                mem_str = repr(mem)
+                return f"ps.QRAMCircuit_qutrit({addr}, {data}, {mem_str})"
+            elif ptype == "qram_ref":
+                # {"type": "qram_ref", "name": "qram_param"}
+                # Reference to a declared param that holds a QRAM circuit
+                ref_name = ref.get("name", "")
+                if param_names and ref_name in param_names:
+                    return f"self.{ref_name}"
+                return ref_name
+            else:
+                return str(ref)
         else:
             return str(ref)
 
@@ -682,6 +735,32 @@ class CodeGenerator:
             lines.append(f"        raise NotImplementedError(\"control override '{override_type}' not implemented\")")
 
         return lines
+
+    def _resolve_python_block_line(self, code_line: str,
+                                    param_names: List[str] = None,
+                                    local_vars: Dict[str, str] = None) -> str:
+        """Resolve $self.XXX references in a python block code line.
+
+        Substitutes bare identifiers that match declared param names with self.XXX.
+        Also handles $var references from for_each loops.
+        """
+        import re as _re
+        result = code_line
+
+        # Substitute $var references (for_each loop variables)
+        if local_vars:
+            for var_name, var_value in local_vars.items():
+                result = result.replace(f"${var_name}", var_value)
+
+        # Substitute bare param names with self.param_name (only in word boundaries)
+        if param_names:
+            for pname in param_names:
+                # Match $pname as a word boundary token (not inside a string)
+                # Simple approach: replace $pname with self.pname
+                pattern = r'\$' + _re.escape(pname) + r'\b'
+                result = _re.sub(pattern, f"self.{pname}", result)
+
+        return result
 
     def generate_file_content(self, gen_class: GeneratedClass) -> str:
         """Generate complete file content for a generated class."""

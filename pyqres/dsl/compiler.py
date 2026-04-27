@@ -54,6 +54,9 @@ class DSLCompiler:
                     self.library_definitions[name] = defn
         elif lib_path.is_dir():
             for yml_file in lib_path.rglob("*.yml"):
+                # Skip demo/example directories in libraries
+                if any(part == "demos" for part in yml_file.parts):
+                    continue
                 definitions = self._load_definitions_from_file(yml_file)
                 for defn in definitions:
                     name = defn.get("name", "")
@@ -142,6 +145,9 @@ class DSLCompiler:
 
         all_definitions = []
         for yml_file in sorted(schema_path.rglob("*.yml")):
+            # Skip demo/example directories
+            if any(part == "demos" for part in yml_file.parts):
+                continue
             with open(yml_file, "r") as f:
                 definitions = yaml.safe_load(f)
             if definitions is None:

@@ -1,7 +1,7 @@
 import pysparq
 
 from ..core.operation import Primitive
-from ..core.utils import merge_controllers, get_control_qubit_count, mcx_t_count
+from ..core.utils import merge_controllers, get_control_qubit_count, mcx_t_count, reg_sz
 from ..core.simulator import PyQSparseOperationWrapper
 
 
@@ -9,20 +9,20 @@ class CondRot_General_Bool(Primitive):
     """Conditional rotation based on rational value register.
 
     Supports two forms:
-    - 2-arg: rotation determined by register value (cond_reg, target_reg)
-    - 3-arg: rotation determined by arbitrary Python function
-      (cond_reg, target_reg, angle_function)
+    - 2-arg (resource estimation only): reg_list=[cond_reg, target_reg]
+    - 3-arg (simulation): reg_list=[cond_reg, target_reg], param_list=[angle_function]
+      where angle_function is a Callable[[int], list[complex]].
 
-    The 3-arg form is used in block encoding UR/UL and StatePrepViaQRAM.
-    The angle_function receives the register value and returns a u22_t
-    (2x2 unitary matrix) — for now, t_count returns NotImplementedError
-    since the cost depends on the function body.
+    pysparq requires the 3-arg form: CondRot_General_Bool(reg_in, reg_out, angle_function).
+    angle_function receives the register value and returns a 2x2 unitary matrix.
     """
     def __init__(self, reg_list, param_list=None, angle_function=None):
         super().__init__(reg_list, param_list)
         self.cond_reg = reg_list[0]
         self.target_reg = reg_list[1]
-        self.angle_function = angle_function
+        # Prefer keyword arg; fall back to param_list[0]
+        self.angle_function = angle_function if angle_function is not None else (
+            param_list[0] if param_list else None)
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
@@ -31,8 +31,13 @@ class CondRot_General_Bool(Primitive):
                 pysparq.CondRot_General_Bool(
                     self.cond_reg, self.target_reg, self.angle_function))
         else:
+            # Fallback for resource estimation without angle_function:
+            # use identity rotation (theta=0)
+            n = reg_sz(self.cond_reg)
+            default_func = lambda value, _n=n: [complex(1, 0), 0j, 0j, complex(1, 0)]
             obj = PyQSparseOperationWrapper(
-                pysparq.CondRot_General_Bool(self.cond_reg, self.target_reg))
+                pysparq.CondRot_General_Bool(
+                    self.cond_reg, self.target_reg, default_func))
         obj.set_controller(controllers_ctx)
         return obj
 

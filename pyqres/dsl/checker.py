@@ -119,12 +119,18 @@ class CompletenessChecker:
             self.add_definition(defn, source)
 
     def load_from_directory(self, schema_dir: str):
-        """Load all definitions from a directory of YAML files."""
+        """Load all definitions from a directory of YAML files.
+
+        Skips subdirectories named 'demos/' (used for example schemas).
+        """
         schema_path = Path(schema_dir)
         if not schema_path.exists():
             return
 
         for yml_file in sorted(schema_path.rglob("*.yml")):
+            # Skip demo/example directories
+            if any(part == "demos" for part in yml_file.parts):
+                continue
             with open(yml_file, "r") as f:
                 definitions = yaml.safe_load(f)
             if definitions is None:

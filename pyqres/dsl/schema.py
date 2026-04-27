@@ -39,7 +39,11 @@ class SchemaValidator:
         "General", "UnsignedInteger", "SignedInteger", "Boolean", "Rational"
     }
     VALID_PARAM_TYPES = {
-        "int", "float", "symbol", "array", "object", "str", "bool"
+        "int", "float", "symbol", "array", "object", "str", "bool",
+        "callable",   # Python function reference: {"type": "callable", "name": "make_func"}
+        "op_instance",  # Operation instance: {"type": "op_instance", "name": "GroverOracle"}
+        "qram",         # QRAM circuit object: {"type": "qram", "addr_size": int, "data_size": int, "memory": list}
+        "qram_ref",     # Reference to a declared QRAM param: {"type": "qram_ref", "name": "qram"}
     }
 
     def __init__(self):
@@ -167,6 +171,38 @@ class SchemaValidator:
                     param_path,
                     f"Invalid param type '{param['type']}'"
                 ))
+            else:
+                # Type-specific validation
+                ptype = param["type"]
+                if ptype == "callable":
+                    if "name" not in param or not isinstance(param.get("name"), str):
+                        self.errors.append(ValidationError(
+                            param_path,
+                            "'callable' param requires {'type': 'callable', 'name': '<func_name>'}"
+                        ))
+                elif ptype == "op_instance":
+                    if "name" not in param or not isinstance(param.get("name"), str):
+                        self.errors.append(ValidationError(
+                            param_path,
+                            "'op_instance' param requires {'type': 'op_instance', 'name': '<op_name>'}"
+                        ))
+                elif ptype == "qram":
+                    if "addr_size" not in param:
+                        self.errors.append(ValidationError(
+                            param_path,
+                            "'qram' param requires 'addr_size'"
+                        ))
+                    if "data_size" not in param:
+                        self.errors.append(ValidationError(
+                            param_path,
+                            "'qram' param requires 'data_size'"
+                        ))
+                elif ptype == "qram_ref":
+                    if "name" not in param or not isinstance(param.get("name"), str):
+                        self.errors.append(ValidationError(
+                            param_path,
+                            "'qram_ref' param requires {'type': 'qram_ref', 'name': '<param_name>'}"
+                        ))
 
     def _validate_temp_regs(self, temp_regs: Any, path: str):
         """Validate temporary register declarations."""
@@ -233,7 +269,21 @@ class SchemaValidator:
             # Validate params references
             if "params" in call:
                 for j, ref in enumerate(call["params"]):
-                    if isinstance(ref, str) and ref not in all_names:
+                    # Dict refs are special types (callable/op_instance/qram) - validate by type
+                    if isinstance(ref, dict):
+                        ptype = ref.get("type")
+                        if ptype in ("callable", "op_instance", "qram"):
+                            # name-based refs reference declared params (must be in all_names)
+                            ref_name = ref.get("name")
+                            if isinstance(ref_name, str) and ref_name not in all_names:
+                                self.errors.append(ValidationError(
+                                    f"{call_path}.params[{j}]",
+                                    f"Reference '{ref_name}' not found in declared names"
+                                ))
+                        else:
+                            # Generic dict - treat as potentially invalid
+                            pass
+                    elif isinstance(ref, str) and ref not in all_names:
                         self.errors.append(ValidationError(
                             f"{call_path}.params[{j}]",
                             f"Reference '{ref}' not found in declared names"
