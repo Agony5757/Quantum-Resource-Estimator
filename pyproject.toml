@@ -11,7 +11,7 @@ dependencies = [
     "lark",
     "sympy",
     "pyyaml",
-    "pysparq @ git+https://github.com/Agony5757/QRAM-Simulator.git@main",
+    "pysparq @ git+https://github.com/IAI-USTC-Quantum/QRAM-Simulator.git@main",
 ]
 
 [project.optional-dependencies]
