@@ -1,12 +1,51 @@
 # Block Encoding Operations
-# For complex operations, use Python classes in pyqres/algorithms/block_encoding.py
+#
+# Complex operations requiring Python closures (Callable params) or
+# ps.QRAMCircuit_qutrit runtime objects stay as Python classes:
+#   - BlockEncodingTridiagonal: dynamic _overflow/_other temp registers + custom sum_t_count
+#   - UR: loop with Python angle_function closure (make_func)
+#   - UL: loop with Python angle_function closure + final-iteration special case
+#   - BlockEncodingViaQRAM: requires ps.QRAMCircuit_qutrit object at runtime
+#
+# See pyqres/algorithms/block_encoding.py for Python implementations.
+#
+# This YAML file demonstrates the DSL's new Callable and qram_ref param types.
+# BlockEncodingViaQRAM uses qram_ref to pass a QRAM circuit to suboperations (UR, UL).
 
-# Simple tridiagonal block encoding placeholder
-# The actual implementation uses complex runtime-computed parameters
-# which don't fit well in the static DSL schema system
+# ---------------------------------------------------------------------------
+# BlockEncodingViaQRAM — demonstrates qram_ref param type
+# ---------------------------------------------------------------------------
+# Usage: Python code passes qram circuit as a param:
+#   qram = ps.QRAMCircuit_qutrit(addr_size, data_size, memory)
+#   op = BlockEncodingViaQRAM(reg_list=[row, col],
+#                              param_list=[data_size, rational_size, qram])
+#   # Python code: op.ur.qram = qram; op.ul.qram = qram
+#
+# NOTE: UR and UL are Python classes (need Python closures for angle_function).
+# This YAML entry documents the interface; actual composition is in Python.
 
+- name: BlockEncodingViaQRAM
+  description: "Block encoding via QRAM: U_A = SWAP · UR† · UL (interface definition)"
+  qregs:
+    - {name: row_index, type: UnsignedInteger}
+    - {name: column_index, type: UnsignedInteger}
+  params:
+    - {name: data_size, type: int, desc: "Bit-width of data register"}
+    - {name: rational_size, type: int, desc: "Bit-width of rational rotation register"}
+    - {name: qram, type: qram_ref, desc: "QRAM circuit object (set at runtime)"}
+  impl:
+    # NOTE: qram is passed to suboperations via self.qram (set by Python factory).
+    # This YAML documents the composition; actual suboperation wiring is in Python
+    # because UR/UL need Python angle_function closures.
+    - comment: "UL(row, col) — left-multiplication operator (Python class, needs qram runtime)"
+    - comment: "UR(col) dagger — right-multiplication operator (Python class, needs qram runtime)"
+    - comment: "Swap(row, col) — swap row and column index registers"
+
+# ---------------------------------------------------------------------------
+# SimpleBlockEncoding — minimal placeholder for resource estimation
+# ---------------------------------------------------------------------------
 - name: SimpleBlockEncoding
-  description: "Simple block encoding placeholder for resource estimation"
+  description: "Minimal block encoding placeholder for basic resource estimation"
   qregs:
     - {name: main_reg, type: UnsignedInteger}
     - {name: anc_reg, type: UnsignedInteger}
@@ -14,12 +53,10 @@
     - {name: alpha, type: float, desc: "Diagonal coefficient"}
     - {name: beta, type: float, desc: "Off-diagonal coefficient"}
   impl:
-    # Placeholder implementation for basic resource estimation
     - op: Hadamard
       qregs: [anc_reg]
     - op: Reflection_Bool
       qregs: [anc_reg]
       params: [true]
-
   self_conjugate: false
   sum_t_count_formula: custom

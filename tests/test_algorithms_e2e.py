@@ -29,12 +29,12 @@ from pyqres.algorithms.qda_solver import (
 )
 
 # Import BlockEncoding and StatePreparation from PySparQ
-from pysparq.algorithms import BlockEncoding, StatePreparation
+from pyqres.algorithms.qda_solver import BlockEncoding, StatePreparation
 from pysparq.algorithms.qda_solver import BlockEncodingHs, BlockEncodingHsPD, WalkS, LCU, Filtering
 
 # Import PySparQ solver functions (they use pysparq.algorithms internally)
 from pysparq.algorithms.cks_solver import (
-    cks_solve,
+    cks_solve_v2,
     ChebyshevPolynomialCoefficient as PS_Chebyshev,
 )
 from pysparq.algorithms.qda_solver import (
@@ -133,25 +133,21 @@ class TestCKSHelpers:
 class TestCKSSolve:
     """Tests for PySparQ CKS solve function."""
 
-    @pytest.mark.skip(reason="pysparq cks_solver uses QRAMCircuit_qutrit(addr_size, data_size, mat.data) "
-                             "which raises ValueError; address_size attr also missing on QRAMCircuit_qutrit")
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_cks_solve_simple(self):
         """Test CKS solve with simple 2x2 system."""
         A = np.array([[2, 1], [1, 2]], dtype=float)
         b = np.array([1, 1], dtype=float)
-        x = cks_solve(A, b, eps=0.1)
+        x = cks_solve_v2(A, b, eps=0.1)
         assert x is not None
         np.testing.assert_allclose(A @ x, b, atol=1e-6)
 
-    @pytest.mark.skip(reason="pysparq cks_solver uses QRAMCircuit_qutrit(addr_size, data_size, mat.data) "
-                             "which raises ValueError; address_size attr also missing on QRAMCircuit_qutrit")
     @pytest.mark.filterwarnings("ignore::RuntimeWarning")
     def test_cks_solve_3x3(self):
         """Test CKS solve with 3x3 system."""
         A = np.array([[4, 1, 0], [1, 4, 1], [0, 1, 4]], dtype=float)
         b = np.array([1, 2, 1], dtype=float)
-        x = cks_solve(A, b, eps=0.1)
+        x = cks_solve_v2(A, b, eps=0.1)
         np.testing.assert_allclose(A @ x, b, atol=1e-6)
 
 
@@ -212,9 +208,6 @@ class TestQDAHelpers:
 
 
 class TestQDABlockEncoding:
-    @pytest.mark.skip(reason="pysparq System::get_register_info dereferences end iterator when "
-                             "register 'main' not found — segfault in C++. Also: "
-                             "BlockEncodingViaQRAM.__init__ calls size_of(unknown_reg)")
     def test_block_encoding_creation(self):
         A = np.array([[2, 1], [1, 2]], dtype=float)
         b = np.array([1, 0], dtype=float)
@@ -231,8 +224,6 @@ class TestQDABlockEncoding:
             assert len(R) == 4
             assert all(isinstance(r, complex) for r in R)
 
-    @pytest.mark.skip(reason="pysparq System::get_register_info dereferences end iterator — segfault. "
-                             "test_walk_s_fs_range also calls BlockEncoding(A) which crashes.")
     def test_walk_s_fs_range(self):
         A = np.array([[2, 1], [1, 2]], dtype=float)
         b = np.array([1, 0], dtype=float)

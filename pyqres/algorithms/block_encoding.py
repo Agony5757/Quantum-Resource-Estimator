@@ -34,6 +34,7 @@ from ..primitives.qram import QRAMFast
 from ..primitives.cond_rot import CondRot_General_Bool
 from ..primitives.register_ops import SplitRegister, CombineRegister
 from ..primitives.state_prep import Rot_GeneralStatePrep, Normalize, ClearZero
+from ..algorithms.state_prep import make_func, make_func_inv
 from ..primitives.transform import Reflection_Bool
 
 
@@ -229,6 +230,11 @@ class UR(StandardComposite):
 
         self.program_list = []
 
+        # Create angle-function closure capturing rational_size (n_digit).
+        # pysparq CondRot_General_Bool calls angle_function(value, n_digit).
+        n_digit = self.rational_size
+        func = lambda value, _n=n_digit: make_func(value, _n)
+
         for k in range(self.addr_size):
             # Split one bit from column_index
             self.program_list.append(
@@ -265,7 +271,7 @@ class UR(StandardComposite):
             self.program_list.append(
                 CondRot_General_Bool(
                     reg_list=["_div_result", "_rot"],
-                    param_list=[]))
+                    param_list=[func]))  # 3-arg: pass angle_function
 
             self.program_list.append(ClearZero(reg_list=[], param_list=[1e-10]))
 
@@ -355,6 +361,10 @@ class UL(StandardComposite):
 
         self.program_list = []
 
+        # Create angle-function closure capturing rational_size (n_digit).
+        n_digit = self.rational_size
+        func = lambda value, _n=n_digit: make_func(value, _n)
+
         for k in range(self.addr_size, 2 * self.addr_size):
             self.program_list.append(
                 SplitRegister(reg_list=[self.row_index, "_rot"], param_list=[1]))
@@ -395,7 +405,8 @@ class UL(StandardComposite):
                         param_list=[]))
                 self.program_list.append(
                     CondRot_General_Bool(
-                        reg_list=["_div_result", "_rot"], param_list=[]))
+                        reg_list=["_div_result", "_rot"],
+                        param_list=[func]))  # 3-arg: pass angle_function
                 # Uncompute
                 self.program_list.append(
                     Div_Sqrt_Arccos_Int_Int(
@@ -424,7 +435,8 @@ class UL(StandardComposite):
                         param_list=[]))
                 self.program_list.append(
                     CondRot_General_Bool(
-                        reg_list=["_data_parent", "_rot"], param_list=[]))
+                        reg_list=["_data_parent", "_rot"],
+                        param_list=[func]))  # 3-arg: pass angle_function
                 # Uncompute
                 self.program_list.append(
                     GetRotateAngle_Int_Int(

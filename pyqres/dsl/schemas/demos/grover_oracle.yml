@@ -1,0 +1,64 @@
+# Grover Search with Oracle as a Parameter
+#
+# Demonstrates the DSL's op_instance param type:
+#   An oracle operation can be passed as a parameter to GroverSearch.
+#
+# Usage from Python:
+#   class MyOracle(StandardComposite):
+#       def __init__(self, reg_list, param_list=None):
+#           super().__init__(reg_list=reg_list, param_list=param_list)
+#           self.program_list = [
+#               X(reg_list=self.reg_list),  # flip |0> to |1>
+#           ]
+#           self.declare_program_list()
+#
+#   OperationRegistry.register(MyOracle, name="MyOracle")
+#
+#   grover = GroverSearchWithOracle(
+#       reg_list=[addr],
+#       param_list=[n_qubits, n_repeats, MyOracle])
+#
+# The op_instance param allows this pattern without hardcoding oracle logic.
+
+- name: GroverSearchWithOracle
+  description: "Grover search where the oracle is passed as a parameter (demonstrates op_instance)"
+  qregs:
+    - {name: addr_reg, type: UnsignedInteger, desc: "Address register for superposition"}
+  params:
+    - {name: n_qubits, type: int, desc: "Number of qubits / log2(search space)"}
+    - {name: n_repeats, type: int, desc: "Number of Grover iterations (≈π√N/4)"}
+    - {name: oracle, type: op_instance, desc: "Oracle operation instance (must be registered)"}
+  temp_regs:
+    - {name: flag, size: 1, desc: "Ancilla qubit for phase flip"}
+  impl:
+    # Initialize superposition
+    - op: Hadamard_NDigits
+      qregs: [addr_reg]
+      params: [n_qubits]
+
+    # Grover iterations: Oracle + Diffusion
+    - loop:
+        iterations: n_repeats
+        body:
+          # Oracle application (passed as op_instance param)
+          - op: MyOracle
+            qregs: [addr_reg]
+
+          # HPH Diffusion operator
+          - op: Hadamard_NDigits
+            qregs: [addr_reg]
+            params: [n_qubits]
+
+          # Phase flip on |0...0>
+          - op: X
+            qregs: [addr_reg]
+
+          - op: CNOT
+            qregs: [addr_reg, flag]
+
+          - op: X
+            qregs: [addr_reg]
+
+          - op: Hadamard_NDigits
+            qregs: [addr_reg]
+            params: [n_qubits]
