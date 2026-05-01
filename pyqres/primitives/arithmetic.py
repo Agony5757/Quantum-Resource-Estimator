@@ -72,12 +72,13 @@ class Add_ConstUInt(Primitive):
     def __init__(self, reg_list, param_list):
         super().__init__(reg_list=reg_list, param_list=param_list)
         self.input_reg = reg_list[0]
+        self.output_reg = reg_list[1] if len(reg_list) > 1 else reg_list[0]
         self.add = param_list[0]
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
         obj = PyQSparseOperationWrapper(
-            pysparq.Add_ConstUInt(self.input_reg, self.add))
+            pysparq.Add_UInt_ConstUInt(self.input_reg, self.add, self.output_reg))
         obj.set_dagger(dagger_ctx ^ self.dagger_flag)
         obj.set_controller(controllers_ctx)
         return obj
@@ -118,7 +119,7 @@ class ShiftLeft(Primitive):
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
-        obj = PyQSparseOperationWrapper(pysparq.ShiftLeft(self.reg, self.shift_bits))
+        obj = PyQSparseOperationWrapper(pysparq.ShiftLeft_InPlace(self.reg, self.shift_bits))
         obj.set_dagger(dagger_ctx ^ self.dagger_flag)
         obj.set_controller(controllers_ctx)
         return obj
@@ -135,7 +136,7 @@ class ShiftRight(Primitive):
 
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
-        obj = PyQSparseOperationWrapper(pysparq.ShiftRight(self.reg, self.shift_bits))
+        obj = PyQSparseOperationWrapper(pysparq.ShiftRight_InPlace(self.reg, self.shift_bits))
         obj.set_dagger(dagger_ctx ^ self.dagger_flag)
         obj.set_controller(controllers_ctx)
         return obj
