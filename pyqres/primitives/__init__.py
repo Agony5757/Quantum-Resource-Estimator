@@ -30,7 +30,7 @@ from .transform import QFT, InverseQFT, Reflection_Bool
 from .state_prep import (
     Normalize, ClearZero, Init_Unsafe, Rot_GeneralStatePrep,
     # New Phase 2 state prep
-    ViewNormalization,
+    ViewNormalization, SortExceptKey, SortExceptKeyHadamard,
 )
 from .qram import QRAM, QRAMFast
 from .cond_rot import (
@@ -38,6 +38,8 @@ from .cond_rot import (
     ZeroConditionalPhaseFlip, RangeConditionalPhaseFlip,
     # New Phase 2 conditional rotations
     CondRot_Rational_Bool, Rot_GeneralUnitary,
+    CondRot_Fixed_Bool, CondRot_General_Bool_QW_fast,
+    GetQWRotateAngle_Int_Int_Int,
 )
 from .measurement import (
     PartialTrace, PartialTraceSelect, PartialTraceSelectRange,
@@ -73,13 +75,15 @@ __all__ = [
     "QFT", "InverseQFT", "Reflection_Bool",
     # State prep
     "Normalize", "ClearZero", "Init_Unsafe", "Rot_GeneralStatePrep",
-    "ViewNormalization",
+    "ViewNormalization", "SortExceptKey", "SortExceptKeyHadamard",
     # QRAM
     "QRAM", "QRAMFast",
     # Conditional Rotation
     "CondRot_General_Bool", "CondRot_General_Bool_QW",
     "ZeroConditionalPhaseFlip", "RangeConditionalPhaseFlip",
     "CondRot_Rational_Bool", "Rot_GeneralUnitary",
+    "CondRot_Fixed_Bool", "CondRot_General_Bool_QW_fast",
+    "GetQWRotateAngle_Int_Int_Int",
     # Measurement
     "PartialTrace", "PartialTraceSelect", "PartialTraceSelectRange",
     "Prob", "StatePrint",

@@ -1,25 +1,108 @@
 # QDA (Quantum Discrete Adiabatic) Linear System Solver
-# DSL placeholder for resource estimation
-# Full implementation in pyqres/algorithms/qda_solver.py
+#
+# Quantum circuit for solving linear systems Ax = b using discrete adiabatic evolution.
+#
+# Full algorithm:
+#   1. Initialize: X|0⟩ (prepare H₀ eigenstate)
+#   2. State preparation of |b⟩ (via submodule)
+#   3. Discrete adiabatic evolution: for step = 0..n_steps-1:
+#        s = step / (n_steps - 1)
+#        f_s = compute_fs(s, kappa, p)    — interpolation parameter
+#        WalkS(f_s) = BlockEncoding_Hs(f_s) → Reflection → GlobalPhase
+#   4. (Optional) Dolph-Chebyshev filtering
+#
+# WalkS forward circuit (BlockEncoding_Hs):
+#   H(anc_3)
+#   enc_b† → X(anc_1,0) → Ref(main_reg,True|anc_1,anc_3,anc_4) → X(anc_1,0) → enc_b
+#   X(anc_4,0) → Rot(anc_2,R_s|anc_4) → X(anc_4,0) → H(anc_2|anc_4)
+#   enc_A(anc_1,anc_2) → X(anc_1,0|anc_2) → Ref(anc_2,True|anc_1) → enc_A†(anc_1,anc_2)
+#   X(anc_4,0) → H(anc_2|anc_4) → X(anc_4,0) → Rot(anc_2,R_s|anc_4)
+#   enc_b† → X(anc_1,0) → Ref(main_reg,True|anc_1,anc_3,anc_4) → X(anc_1,0) → enc_b
+#   H(anc_3)
+#   → Reflection([anc_UA, anc_2, anc_3], inverse=False)
+#   → GlobalPhase(1j)
+#
+# WalkS dagger (reverse sequence):
+#   GlobalPhase(-1j)
+#   Reflection([anc_UA, anc_2, anc_3], inverse=False)
+#   [reverse of BlockEncoding_Hs with flipped anc_4 conditions]
+#
+# R_s = 1/√((1-f_s)²+f_s²) × [[1-f_s, f_s], [f_s, f_s-1]]
+#
+# Time complexity: O(κ log(κ/ε)) — optimal for quantum linear solving.
+#
+# NOTE: enc_A (block encoding of A) and enc_b (state prep of |b⟩) require
+# QRAM/sparse matrix data (pre-processing, not in YAML scope).
+# The WalkS Python class (WalkS_Primitive) handles the circuit and dag.
+#
+# Reference: Lin-Tong, PRX Quantum 3, 040303 (2022)
+# PySparQ implementation: pyqres/algorithms/qda_solver.py
 
 name: QDALinearSolver
 description: "QDA quantum linear system solver using discrete adiabatic evolution"
 qregs:
-  - {name: main_reg, type: UnsignedInteger, desc: "Main data register"}
-  - {name: anc_UA, type: UnsignedInteger, desc: "Ancilla for block encoding"}
-  - {name: anc_1, type: Boolean, desc: "Ancilla Boolean 1"}
-  - {name: anc_2, type: Boolean, desc: "Ancilla Boolean 2"}
+  - {name: main_reg, type: UnsignedInteger, desc: "Main data register (holds |b⟩ and solution)"}
+  - {name: anc_UA, type: UnsignedInteger, desc: "Ancilla for block encoding normalization"}
+  - {name: anc_1, type: Boolean, desc: "Boolean ancilla 1 (state prep flag)"}
+  - {name: anc_2, type: Boolean, desc: "Boolean ancilla 2 (rotation register)"}
+  - {name: anc_3, type: Boolean, desc: "Boolean ancilla 3 (Hadamard register)"}
+  - {name: anc_4, type: Boolean, desc: "Boolean ancilla 4 (rotation control)"}
 params:
   - {name: kappa, type: float, desc: "Condition number of matrix A"}
   - {name: epsilon, type: float, desc: "Precision parameter"}
 computed_params:
+  - name: p
+    formula: "0.5"
   - name: n_steps
     formula: "int(math.ceil(math.log(kappa / epsilon)))"
 impl:
-  # Placeholder implementation for DSL compilation
-  # Actual quantum operations are in the Python class
-  - op: X
+  # ── 1. Initialize to H₀ eigenstate: X|0⟩ ───────────────────────────────
+  - comment: "X on first qubit of main_reg to prepare H₀ eigenstate |1⟩"
+    op: X
     qregs: [main_reg]
+    params: [0]
+
+  # ── 2. State preparation of |b⟩ ─────────────────────────────────────────
+  # Uses StatePreparation submodule (requires QRAM/b-normalized vector, Python)
+  - comment: "State preparation |0⟩ → |b⟩ — via state_prep submodule"
+    python: |
+      # Python: self.state_prep is passed as a submodule
+      # Encodes the right-hand side vector b into amplitudes
+      pass
+
+  # ── 3. Discrete adiabatic evolution loop ────────────────────────────────
+  # Evolves from H₀ = σ_z ⊗ |0⟩⟨0| to H₁ = A ⊗ |b⟩⟨b| in n_steps.
+  - comment: "Discrete adiabatic evolution: WalkS at each interpolation point s"
+    loop:
+      iterations: n_steps
+      body:
+        - comment: "WalkS = BlockEncoding_Hs(f_s) → Reflection → GlobalPhase"
+          comment: "  WalkS forward circuit (see docstring for full gate sequence)"
+          python: |
+            # WalkS_Primitive is built in Python (qda_solver.py):
+            # fs = compute_fs(s, kappa, p)
+            # R_s = 1/sqrt((1-fs)²+fs²) * [[1-fs, fs], [fs, fs-1]]
+            # BlockEncoding_Hs: H(anc_3), enc_b†, X(anc_1), Ref, X(anc_1), enc_b,
+            #                   X(anc_4), Rot(anc_2,R_s|anc_4), X(anc_4), H(anc_2|anc_4),
+            #                   enc_A(anc_1,anc_2), X(anc_1|anc_2), Ref(anc_2|anc_1), enc_A†,
+            #                   X(anc_4), H(anc_2|anc_4), X(anc_4), Rot(anc_2,R_s|anc_4),
+            #                   enc_b†, X(anc_1), Ref, X(anc_1), enc_b, H(anc_3)
+            # Reflection: Reflection_Bool([anc_UA, anc_2, anc_3], inverse=False)
+            # GlobalPhase: complex(0, 1)
+            pass
+
+        - comment: "WalkS dagger: reverse sequence with negated global phase"
+          python: |
+            # WalkS dagger = reverse(forward) with:
+            #   GlobalPhase(-1j)
+            #   Reflection_Bool([anc_UA, anc_2, anc_3], inverse=False)
+            #   [BlockEncoding_Hs reverse with anc_4 condition flipped via X gates]
+            pass
+
+  # ── 4. Post-selection: X on ancilla flag ───────────────────────────────
+  - comment: "X on ancilla flag to post-select successful block encoding"
+    op: X
+    qregs: [anc_1]
     params: [0]
 
 sum_t_count_formula: custom

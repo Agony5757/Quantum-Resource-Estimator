@@ -28,7 +28,7 @@ from pysparq.algorithms.cks_solver import QuantumBinarySearch
 
 from ..core.operation import AbstractComposite
 from ..core.registry import OperationRegistry
-from ..core.utils import reg_sz
+from ..core.utils import reg_sz, merge_controllers
 
 
 # ==============================================================================
@@ -717,6 +717,15 @@ class LCUContainer:
 class CKSLinearSolver(AbstractComposite):
     """CKS Quantum Linear System Solver as pyqres Operation.
 
+    Implements Chebyshev-filtered quantum walk for solving linear systems Ax = b.
+    Time complexity: O(κ log(κ/ε)).
+
+    Quantum circuit structure:
+      1. Block encoding of A and state preparation of |b⟩ (via submodules)
+      2. Chebyshev iteration: for j = 0..j0:
+           H on ancilla → (2j+1) × QuantumWalkStep
+         where QuantumWalkStep = T† → PhaseFlip → T → SWAPs
+
     Args:
         reg_list: [main_reg, anc_reg] - data and ancilla registers
         param_list: [kappa, epsilon] - condition number and precision
@@ -735,30 +744,98 @@ class CKSLinearSolver(AbstractComposite):
         self._build_program_list()
 
     def _build_program_list(self):
+        from ..primitives import (
+            Hadamard, ZeroConditionalPhaseFlip,
+            Swap_General_General,
+        )
+
         self.program_list = []
 
+        # ── Block encoding of A ─────────────────────────────────────────────
         if self.encode_A:
             self.program_list.append(
                 self.encode_A(reg_list=[self.main_reg, self.anc_reg],
                               param_list=[self.kappa, self.eps]))
 
+        # ── State preparation of |b⟩ ─────────────────────────────────────────
         if self.encode_b:
             self.program_list.append(
                 self.encode_b(reg_list=[self.main_reg],
                               param_list=[self.eps]))
 
+        # ── Chebyshev iteration ─────────────────────────────────────────────
         b = int(np.ceil(self.kappa ** 2 * (np.log(self.kappa) - np.log(self.eps))))
         cheb = ChebyshevPolynomialCoefficient(b)
+        j0 = int(np.sqrt(b * (np.log(4 * b) - np.log(self.eps))))
 
-        for j in range(min(cheb.b, 2 * int(np.sqrt(b)) + 1)):
+        H_op = Hadamard
+        ZCPF_op = ZeroConditionalPhaseFlip
+        Swap_op = Swap_General_General
+
+        # j_comp and k_comp are complement registers (n_qubits each)
+        n_qubits = reg_sz(self.main_reg) if isinstance(self.main_reg, str) else 1
+
+        for j in range(j0 + 1):
             step_count = cheb.step(j)
-            H_op = OperationRegistry.get_class("Hadamard")
-            R_op = OperationRegistry.get_class("Reflection_Bool")
+            # H on all qubits of anc_reg
+            self.program_list.append(H_op(reg_list=[self.anc_reg]))
+
             for _ in range(step_count):
-                self.program_list.append(H_op(reg_list=[self.anc_reg]))
-                self.program_list.append(R_op(reg_list=[self.anc_reg], param_list=[True]))
+                # ── One quantum walk half-step ─────────────────────────────
+                # PhaseFlip on [j_comp, k_comp, b1, k, b2]
+                # (simplified: use anc_reg as the flag register)
+                self.program_list.append(
+                    ZCPF_op(reg_list=[self.anc_reg]))
+
+                # TOperator forward: Hadamard on k + load + cond_rot + swap
+                # (handled by Python block or TOperator_Primitive submodule)
+                if self.encode_A:
+                    self.program_list.append(
+                        self.encode_A(reg_list=[self.main_reg, self.anc_reg],
+                                      param_list=[self.kappa, self.eps]))
+
+                # SWAP row ↔ column registers
+                self.program_list.append(
+                    Swap_op(reg_list=[self.main_reg, self.anc_reg]))
+
+                # TOperator dagger
+                if self.encode_A:
+                    self.program_list.append(
+                        self.encode_A(reg_list=[self.main_reg, self.anc_reg],
+                                      param_list=[self.kappa, self.eps]).dagger())
 
         self.declare_program_list()
+
+    def traverse_children(self, visitor, dagger_ctx=False, controllers_ctx=None):
+        """Custom traversal: quantum walk steps must be reversed for dagger.
+
+        CKS dagger: reverse walk steps and dagger the TOperator calls.
+        H (self-adjoint) and ZCPF (self-adjoint) are unchanged.
+        """
+        effective_dagger = self.dagger_flag ^ dagger_ctx
+        controllers_ctx = controllers_ctx or {}
+        controllers_ctx = merge_controllers(controllers_ctx, self.controllers)
+
+        if not effective_dagger:
+            for op in self.program_list:
+                op.traverse(visitor, dagger_ctx=False, controllers_ctx=controllers_ctx)
+        else:
+            # Walk steps: reverse order; TOperator gets dagger, H/ZCPF/SWAP stay
+            walk_ops = []
+            non_walk = []
+            for op in self.program_list:
+                non_walk.append(op)
+
+            # Reverse walk portion and dagger TOperator
+            reversed_ops = list(reversed(non_walk))
+            for op in reversed_ops:
+                # TOperator calls: dagger them; H/ZCPF/SWAP are self-adjoint
+                name = getattr(op, 'name', '')
+                if 'BlockEncoding' in name or 'StatePrep' in name or 'TOperator' in name:
+                    op2 = op.dagger()
+                    op2.traverse(visitor, dagger_ctx=False, controllers_ctx=controllers_ctx)
+                else:
+                    op.traverse(visitor, dagger_ctx=False, controllers_ctx=controllers_ctx)
 
     def sum_t_count(self, t_count_list):
         kappa = self.kappa
@@ -771,7 +848,8 @@ class CKSLinearSolver(AbstractComposite):
         encode_b_cost = t_count_list[1] if len(t_count_list) > 1 else 0
 
         n = reg_sz(self.main_reg) if isinstance(self.main_reg, str) else 1
-        walk_step_cost = 4 * n * n + 8 * n
+        # Walk step: PhaseFlip + TOperator(fwd) + SWAP + TOperator(dag) ≈ encode_A_cost
+        walk_step_cost = encode_A_cost if encode_A_cost else (4 * n * n + 8 * n)
 
         total_walk = sum(2 * j + 1 for j in range(j0 + 1)) * walk_step_cost
 
