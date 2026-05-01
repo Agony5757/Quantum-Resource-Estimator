@@ -7,10 +7,10 @@ import math
 
 class SimpleBlockEncoding(AbstractComposite):
     """Minimal block encoding placeholder for basic resource estimation"""
-    def __init__(self, reg_list, param_list=None):
+    def __init__(self, reg_list, param_list=None, operations=None):
         if param_list is None:
             param_list = []
-        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list)
+        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, operations=operations)
         self.main_reg = reg_list[0]
         self.anc_reg = reg_list[1]
         self.alpha = param_list[0]

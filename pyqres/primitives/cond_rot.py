@@ -174,8 +174,9 @@ class Rot_GeneralUnitary(Primitive):
     def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
         controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
         dagger = dagger_ctx ^ self.dagger_flag
+        unitary = pysparq.stateprep_unitary_build_schmidt(self.unitary_matrix)
         obj = PyQSparseOperationWrapper(
-            pysparq.Rot_GeneralUnitary(self.reg, self.unitary_matrix))
+            pysparq.Rot_GeneralUnitary(self.reg, unitary))
         obj.set_dagger(dagger)
         obj.set_controller(controllers_ctx)
         return obj
@@ -183,6 +184,38 @@ class Rot_GeneralUnitary(Primitive):
     def t_count(self, dagger_ctx=False, controllers_ctx=None):
         raise NotImplementedError(
             "Rot_GeneralUnitary t_count depends on the matrix decomposition")
+
+
+class Rot_Bool(Primitive):
+    """Single-qubit rotation via general 2x2 unitary using pysparq Rot_Bool.
+
+    Args:
+        reg_list: [register_name]
+        param_list: [unitary_matrix] where unitary_matrix is a 4-element
+            list [a, b, c, d] representing [[a, b], [c, d]] (row-major).
+
+    Uses pysparq.Rot_Bool which accepts u22_t directly as a Python sequence,
+    avoiding the DenseMatrix_complex API limitation.
+    """
+    __self_conjugate__ = False
+
+    def __init__(self, reg_list, param_list):
+        super().__init__(reg_list=reg_list, param_list=param_list)
+        self.reg = reg_list[0]
+        self.unitary_matrix = param_list[0]
+
+    def pyqsparse_object(self, dagger_ctx=False, controllers_ctx=None):
+        controllers_ctx = merge_controllers(self.controllers, controllers_ctx or {})
+        dagger = dagger_ctx ^ self.dagger_flag
+        obj = PyQSparseOperationWrapper(
+            pysparq.Rot_Bool(self.reg, self.unitary_matrix))
+        obj.set_dagger(dagger)
+        obj.set_controller(controllers_ctx)
+        return obj
+
+    def t_count(self, dagger_ctx=False, controllers_ctx=None):
+        raise NotImplementedError(
+            "Rot_Bool t_count depends on the matrix decomposition")
 
 
 class CondRot_Fixed_Bool(Primitive):

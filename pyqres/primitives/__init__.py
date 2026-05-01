@@ -37,7 +37,7 @@ from .cond_rot import (
     CondRot_General_Bool, CondRot_General_Bool_QW,
     ZeroConditionalPhaseFlip, RangeConditionalPhaseFlip,
     # New Phase 2 conditional rotations
-    CondRot_Rational_Bool, Rot_GeneralUnitary,
+    CondRot_Rational_Bool, Rot_GeneralUnitary, Rot_Bool,
     CondRot_Fixed_Bool, CondRot_General_Bool_QW_fast,
     GetQWRotateAngle_Int_Int_Int,
 )
@@ -81,7 +81,7 @@ __all__ = [
     # Conditional Rotation
     "CondRot_General_Bool", "CondRot_General_Bool_QW",
     "ZeroConditionalPhaseFlip", "RangeConditionalPhaseFlip",
-    "CondRot_Rational_Bool", "Rot_GeneralUnitary",
+    "CondRot_Rational_Bool", "Rot_GeneralUnitary", "Rot_Bool",
     "CondRot_Fixed_Bool", "CondRot_General_Bool_QW_fast",
     "GetQWRotateAngle_Int_Int_Int",
     # Measurement

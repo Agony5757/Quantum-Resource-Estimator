@@ -7,10 +7,10 @@ import math
 
 class QuantumWalkStep(AbstractComposite):
     """One CKS quantum walk half-step: T† · PhaseFlip · T · SWAPs"""
-    def __init__(self, reg_list, param_list=None, temp_reg_list=[('b1', 1), ('b2', 1), ('j_comp', 10), ('k_comp', 10)]):
+    def __init__(self, reg_list, param_list=None, temp_reg_list=[('b1', 1), ('b2', 1), ('j_comp', 10), ('k_comp', 10)], operations=None):
         if param_list is None:
             param_list = []
-        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list)
+        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list, operations=operations)
         self.main_reg = reg_list[0]
         self.anc_reg = reg_list[1]
         self.n_qubits = param_list[0]

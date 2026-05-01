@@ -7,10 +7,10 @@ import math
 
 class QuantumPhaseEstimation(AbstractComposite):
     """Quantum phase estimation for finding eigenvalues"""
-    def __init__(self, reg_list, param_list=None):
+    def __init__(self, reg_list, param_list=None, operations=None):
         if param_list is None:
             param_list = []
-        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list)
+        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, operations=operations)
         self.precision_reg = reg_list[0]
         self.eigenstate_reg = reg_list[1]
         self.n_precision = param_list[0]

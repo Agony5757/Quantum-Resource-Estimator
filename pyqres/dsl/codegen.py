@@ -128,6 +128,17 @@ class CodeGenerator:
                         if "from ..algorithms.state_prep import make_func, make_func_inv" not in imports:
                             imports.append("from ..algorithms.state_prep import make_func, make_func_inv")
 
+            # Extract imports from python: blocks in impl (including nested loop.body)
+            seen = set(imports)
+            for item in self._flatten_impl_items(defn.get("impl", [])):
+                if isinstance(item, dict) and "python" in item:
+                    for line in item["python"].strip().split("\n"):
+                        stripped = line.strip()
+                        if stripped.startswith("from ") or stripped.startswith("import "):
+                            if stripped not in seen:
+                                imports.append(stripped)
+                                seen.add(stripped)
+
         return imports
 
     def _generate_init(self, defn: Dict[str, Any], base_class: str = "StandardComposite") -> List[str]:
@@ -155,6 +166,7 @@ class CodeGenerator:
                 f"('{r['name']}', {r['size']})" for r in temp_regs
             ) + "]"
             sig_parts.append(f"temp_reg_list={temp_default}")
+        sig_parts.append("operations=None")
 
         lines.append(f"    def __init__(self, {', '.join(sig_parts)}):")
 
@@ -169,15 +181,18 @@ class CodeGenerator:
             super_args.append("param_list=param_list")
         if has_temp:
             super_args.append("temp_reg_list=temp_reg_list")
+        super_args.append("operations=operations")
         lines.append(f"        {base_class}.__init__({', '.join(super_args)})")
 
         # Register attributes
         for i, qr in enumerate(qregs):
             lines.append(f"        self.{qr['name']} = reg_list[{i}]")
 
-        # Param attributes
+        # Param attributes (skip operation params — those are stored from operations list instead)
         if has_params:
             for i, p in enumerate(params):
+                if isinstance(p, dict) and p.get("type") == "operation":
+                    continue  # stored from operations list below
                 lines.append(f"        self.{p['name']} = param_list[{i}]")
 
         # Computed params - use self. prefix for self references
@@ -208,6 +223,17 @@ class CodeGenerator:
                 lines.append(f"        self._temp_reg_dict['{name}'] = ('{name}', {size})")
                 lines.append(f"        self.{name} = '{name}'")
 
+        # Store operation params (type: operation) as instance attributes from the operations list
+        op_names = [
+            p["name"] for p in params
+            if isinstance(p, dict) and p.get("type") == "operation"
+        ]
+        if op_names:
+            lines.append("        if operations is None:")
+            lines.append("            operations = []")
+            for i, name in enumerate(op_names):
+                lines.append(f"        self.{name} = operations[{i}] if {i} < len(operations) else None")
+
         # Build program_list (only for simple implementations without loops/conditionals)
         if impl and not has_complex_impl:
             lines.append("        self.program_list = [")
@@ -223,6 +249,24 @@ class CodeGenerator:
             lines.append("        self._build_execute_method()")
 
         return lines
+
+    def _flatten_impl_items(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Recursively flatten impl items, including those nested in loop.body/for_each.body."""
+        flat = []
+        for item in items:
+            if isinstance(item, dict):
+                if "loop" in item:
+                    flat.extend(self._flatten_impl_items(item.get("loop", {}).get("body", [])))
+                elif "loop_reverse" in item:
+                    flat.extend(self._flatten_impl_items(item.get("loop_reverse", {}).get("body", [])))
+                elif "for_each" in item:
+                    flat.extend(self._flatten_impl_items(item.get("for_each", {}).get("body", [])))
+                elif "if" in item:
+                    flat.extend(self._flatten_impl_items(item.get("if", {}).get("then", [])))
+                    flat.extend(self._flatten_impl_items(item.get("if", {}).get("else", [])))
+                else:
+                    flat.append(item)
+        return flat
 
     def _is_complex_impl_item(self, item: Dict[str, Any]) -> bool:
         """Check if an impl item requires complex handling (loops, conditionals, etc.)."""
@@ -289,6 +333,14 @@ class CodeGenerator:
         lines.append("        self.program_list = []")
 
         for call in impl:
+            # Skip top-level python: blocks that contain only import statements
+            # (those are handled by _generate_imports and don't need to be in the method body)
+            if isinstance(call, dict) and call.get("python") is not None:
+                code = call["python"]
+                non_import_lines = [l.strip() for l in code.strip().split("\n")
+                                    if l.strip() and not l.strip().startswith(("from ", "import "))]
+                if not non_import_lines:
+                    continue
             self._add_impl_lines(lines, call, "        ", depth=1, param_names=param_names)
 
         lines.append("        self.declare_program_list()")
