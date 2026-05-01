@@ -33,7 +33,7 @@ impl:
 
   # Set right = total_length (using Add_ConstUInt)
   - op: Add_ConstUInt
-    qregs: [left_register]
+    qregs: [left_register, left_register]
     params: [total_length]
 
   # Binary search iterations

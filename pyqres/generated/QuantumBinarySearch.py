@@ -34,7 +34,7 @@ class QuantumBinarySearch(StandardComposite):
         self._temp_reg_dict['compare_equal'] = ('compare_equal', 1)
         self.compare_equal = 'compare_equal'
         # Complex implementation with loops/conditionals
-        self._impl_structure = [{"_type": "op", "op": "X", "qregs": ["flag"]}, {"_type": "op", "op": "Assign", "qregs": ["address_offset", "left_register"]}, {"_type": "op", "op": "Add_ConstUInt", "qregs": ["left_register"], "params": ["total_length"]}, {"_type": "comment", "text": "Binary search loop"}, {"_type": "op", "op": "X", "qregs": ["flag"]}]
+        self._impl_structure = [{"_type": "op", "op": "X", "qregs": ["flag"]}, {"_type": "op", "op": "Assign", "qregs": ["address_offset", "left_register"]}, {"_type": "op", "op": "Add_ConstUInt", "qregs": ["left_register", "left_register"], "params": ["total_length"]}, {"_type": "comment", "text": "Binary search loop"}, {"_type": "op", "op": "X", "qregs": ["flag"]}]
         self._build_execute_method()
 
     def _build_execute_method(self):
@@ -42,7 +42,7 @@ class QuantumBinarySearch(StandardComposite):
         self.program_list = []
         self.program_list.append(OperationRegistry.get_class("X")(reg_list=[self.flag]))
         self.program_list.append(OperationRegistry.get_class("Assign")(reg_list=[self.address_offset, self.left_register]))
-        self.program_list.append(OperationRegistry.get_class("Add_ConstUInt")(reg_list=[self.left_register], param_list=[self.total_length]))
+        self.program_list.append(OperationRegistry.get_class("Add_ConstUInt")(reg_list=[self.left_register, self.left_register], param_list=[self.total_length]))
         for i in range(self.max_step):
                 self.program_list.append(OperationRegistry.get_class("GetMid_UInt_UInt")(reg_list=[self.left_register, self.right_register, self.mid_register]))
                 self.program_list.append(OperationRegistry.get_class("QRAM")(reg_list=[self.mid_register, self.midval_register], param_list=[0]))

@@ -248,7 +248,7 @@ class UR(StandardComposite):
 
             # In-place: column_index += pow2(k) - 1
             self.program_list.append(
-                Add_ConstUInt(reg_list=[self.column_index], param_list=[pow2(k) - 1]))
+                Add_ConstUInt(reg_list=[self.column_index, self.column_index], param_list=[pow2(k) - 1]))
 
             # Multiply: _addr_child = column_index * 2
             self.program_list.append(
@@ -291,7 +291,7 @@ class UR(StandardComposite):
             # In-place: column_index -= (pow2(k) - 1)
             self.program_list.append(
                 Add_ConstUInt(
-                    reg_list=[self.column_index],
+                    reg_list=[self.column_index, self.column_index],
                     param_list=[-(pow2(k) - 1)]))
             self.program_list.append(
                 ShiftLeft(reg_list=[self.column_index], param_list=[1]))
@@ -372,7 +372,7 @@ class UL(StandardComposite):
             # In-place: _addr_parent += pow2(k) - 1
             self.program_list.append(
                 Add_ConstUInt(
-                    reg_list=["_addr_parent"], param_list=[pow2(k) - 1]))
+                    reg_list=["_addr_parent", "_addr_parent"], param_list=[pow2(k) - 1]))
 
             # Multiply-accumulate: _addr_parent += column_index * pow2(k-self.addr_size)
             # pysparq: Add_Mult_UInt_ConstUInt(column_index, pow2(k-self.addr_size), _addr_parent)
@@ -424,7 +424,7 @@ class UL(StandardComposite):
                     XGate(reg_list=["_addr_parent"], param_list=[0]))
                 # In-place: _addr_child += 1
                 self.program_list.append(
-                    Add_ConstUInt(reg_list=["_addr_child"], param_list=[1]))
+                    Add_ConstUInt(reg_list=["_addr_child", "_addr_child"], param_list=[1]))
                 self.program_list.append(
                     QRAMFast(reg_list=["_addr_parent", "_data_parent"], param_list=[self.qram]))
                 self.program_list.append(
@@ -448,7 +448,7 @@ class UL(StandardComposite):
                     QRAMFast(reg_list=["_addr_child", "_data_child"], param_list=[self.qram]))
                 # In-place: _addr_child -= 1 (dagger)
                 self.program_list.append(
-                    Add_ConstUInt(reg_list=["_addr_child"], param_list=[-1]))
+                    Add_ConstUInt(reg_list=["_addr_child", "_addr_child"], param_list=[-1]))
                 self.program_list.append(
                     XGate(reg_list=["_addr_parent"], param_list=[0]))
                 self.program_list.append(
@@ -472,7 +472,7 @@ class UL(StandardComposite):
             # Uncompute: _addr_parent -= pow2(k) - 1
             self.program_list.append(
                 Add_ConstUInt(
-                    reg_list=["_addr_parent"], param_list=[-(pow2(k) - 1)]))
+                    reg_list=["_addr_parent", "_addr_parent"], param_list=[-(pow2(k) - 1)]))
             self.program_list.append(
                 CombineRegister(reg_list=[self.row_index, "_rot"]))
             self.program_list.append(

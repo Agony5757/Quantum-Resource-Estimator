@@ -186,7 +186,7 @@ class StatePrepViaQRAM(StandardComposite):
             # In-place: _addr_parent += pow2(k) - 1
             self.program_list.append(
                 Add_ConstUInt(
-                    reg_list=["_addr_parent"], param_list=[pow2(k) - 1]))
+                    reg_list=["_addr_parent", "_addr_parent"], param_list=[pow2(k) - 1]))
 
             # In-place: _addr_parent += work_qubit
             self.program_list.append(
@@ -236,7 +236,7 @@ class StatePrepViaQRAM(StandardComposite):
                     XGate(reg_list=["_addr_parent"], param_list=[0]))
                 # In-place: _addr_child += 1
                 self.program_list.append(
-                    Add_ConstUInt(reg_list=["_addr_child"], param_list=[1]))
+                    Add_ConstUInt(reg_list=["_addr_child", "_addr_child"], param_list=[1]))
                 self.program_list.append(
                     QRAMFast(reg_list=["_addr_parent", "_data_parent"],
                              param_list=[self.qram]))
@@ -265,7 +265,7 @@ class StatePrepViaQRAM(StandardComposite):
                              param_list=[self.qram]))
                 # In-place: _addr_child -= 1 (dagger)
                 self.program_list.append(
-                    Add_ConstUInt(reg_list=["_addr_child"], param_list=[-1]))
+                    Add_ConstUInt(reg_list=["_addr_child", "_addr_child"], param_list=[-1]))
                 self.program_list.append(
                     XGate(reg_list=["_addr_parent"], param_list=[0]))
                 self.program_list.append(
@@ -284,7 +284,7 @@ class StatePrepViaQRAM(StandardComposite):
             # Uncompute: _addr_parent -= pow2(k) - 1
             self.program_list.append(
                 Add_ConstUInt(
-                    reg_list=["_addr_parent"], param_list=[-(pow2(k) - 1)]))
+                    reg_list=["_addr_parent", "_addr_parent"], param_list=[-(pow2(k) - 1)]))
             self.program_list.append(
                 CombineRegister(reg_list=[self.work_qubit, "_rotation"]))
             self.program_list.append(
