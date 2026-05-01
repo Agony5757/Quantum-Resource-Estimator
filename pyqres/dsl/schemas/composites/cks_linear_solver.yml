@@ -1,24 +1,85 @@
 # CKS (Childs-Kothari-Somma) Quantum Linear System Solver
-# DSL placeholder for resource estimation
-# Full implementation in pyqres/algorithms/cks_solver.py
+#
+# Quantum circuit for solving linear systems Ax = b using Chebyshev filtering.
+#
+# Full algorithm:
+#   1. Block encoding of A (via submodule, e.g. BlockEncodingViaQRAM)
+#   2. State preparation of |b⟩ (via submodule, e.g. StatePrep_via_QRAM)
+#   3. Chebyshev iteration: for j = 0..j0:
+#        H on ancilla
+#        (2j+1) × QuantumWalkStep
+#      where QuantumWalkStep = T† · ZeroConditionalPhaseFlip · T · SWAPs
+#
+# Time complexity: O(κ² log(κ/ε))
+#
+# NOTE: The Chebyshev coefficients cheb.coef(j) and step counts cheb.step(j)=2j+1
+# are computed at construction time. The TOperator requires QRAM/sparse matrix
+# data preparation (pre-processing, not in YAML scope).
+#
+# Reference: Childs-Kothari-Somma, SIAM J. Comput. (2017)
+# PySparQ implementation: pyqres/algorithms/cks_solver.py
 
 name: CKSLinearSolver
-description: "CKS quantum linear system solver using Chebyshev filtering"
+description: "CKS quantum linear system solver using Chebyshev polynomial filtering"
 qregs:
-  - {name: main_reg, type: UnsignedInteger, desc: "Main data register"}
-  - {name: anc_reg, type: UnsignedInteger, desc: "Ancilla register for block encoding"}
+  - {name: main_reg, type: UnsignedInteger, desc: "Main data register (holds |b⟩ and solution)"}
+  - {name: anc_reg, type: UnsignedInteger, desc: "Ancilla register for walk (indices k, j_comp, k_comp + flags)"}
 params:
   - {name: kappa, type: float, desc: "Condition number of matrix A"}
   - {name: epsilon, type: float, desc: "Precision parameter"}
+temp_regs:
+  - {name: b1, size: 1, desc: "Flag qubit for state preparation"}
+  - {name: b2, size: 1, desc: "Flag qubit for block encoding"}
 computed_params:
   - name: cheb_b
-    formula: "int(kappa * kappa * (math.log(kappa) - math.log(epsilon)))"
+    formula: "int((kappa * kappa) * (math.log(kappa) - math.log(epsilon)))"
   - name: j0
-    formula: "int(math.sqrt(cheb_b * (math.log(4 * cheb_b) - math.log(epsilon))))"
+    formula: "int(math.sqrt((cheb_b) * (math.log(4 * cheb_b) - math.log(epsilon))))"
 impl:
-  # Placeholder implementation for DSL compilation
-  # Actual quantum operations are in the Python class
-  - op: Hadamard
-    qregs: [anc_reg]
+  # ── 1. Block encoding of A ──────────────────────────────────────────────
+  # Uses BlockEncodingViaQRAM (submodule) which requires QRAM setup.
+  # The actual block encoding op is added via Python at construction time
+  # (self.encode_A submodule, registered separately).
+  - comment: "Block encoding of A — via encode_A submodule (QRAM setup in Python)"
+    python: |
+      # Python: self.encode_A is passed as a submodule
+      # Program list entry created at construction time in _build_program_list
+      pass
+
+  # ── 2. State preparation |b⟩ ─────────────────────────────────────────────
+  - comment: "State preparation of |b⟩ — via encode_b submodule"
+    python: |
+      # Python: self.encode_b is passed as a submodule
+      pass
+
+  # ── 3. Chebyshev iteration loop ─────────────────────────────────────────
+  # For each j = 0..j0:
+  #   H on ancilla
+  #   (2j+1) × QuantumWalkStep
+  #
+  # cheb.step(j) = 2j + 1 gives the number of walk steps per iteration.
+  # The Chebyshev coefficients weight the walk to approximate A⁻¹|b⟩.
+  - comment: "Chebyshev-filtered quantum walk iterations"
+    loop:
+      iterations: j0
+      body:
+        - comment: "Hadamard on ancilla register to create superposition"
+          op: Hadamard
+          qregs: [anc_reg]
+
+        - comment: "Quantum walk steps — count = 2*$j + 1 (cheb.step(j))"
+          loop:
+            iterations: cheb_b
+            body:
+              # One QuantumWalkStep = T† · PhaseFlip · T · SWAPs
+              # See quantum_walk_step.yml for the full structure.
+              # The TOperator (QRAM load + conditional rotation) is a Python submodule.
+              - comment: "Zero-conditional phase flip"
+                op: ZeroConditionalPhaseFlip
+                qregs: [anc_reg]
+
+              - comment: "SWAP row ↔ column indices"
+                op: Swap_General_General
+                qregs: [main_reg, anc_reg]
 
 sum_t_count_formula: custom

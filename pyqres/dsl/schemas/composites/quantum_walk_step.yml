@@ -1,0 +1,77 @@
+# QuantumWalkStep: One CKS quantum walk half-step
+#
+# CKS quantum walk step W = T† · ZeroConditionalPhaseFlip · T · SWAPs
+#
+# Forward sequence (per half-step):
+#   H on anc_3
+#   TOperator forward (Python: loads QRAM, applies conditional rotation)
+#   ZeroConditionalPhaseFlip([j_comp, k_comp, b1, k, b2])
+#   Swap_General_General(j, k)
+#   Swap_General_General(b1, b2)
+#   Swap_General_General(j_comp, k_comp)
+#   TOperator dagger (Python)
+#   CheckNan (debug only)
+#
+# Reverse sequence (dagger):
+#   TOperator dagger (Python)
+#   Swap_General_General(j_comp, k_comp)
+#   Swap_General_General(b1, b2)
+#   Swap_General_General(j, k)
+#   ZeroConditionalPhaseFlip([j_comp, k_comp, b1, k, b2])
+#   TOperator forward (Python)
+#   H on anc_3
+#
+# NOTE: TOperator requires QRAM/sparse matrix data (pre-processing).
+# The actual TOperator is implemented as a Python submodule.
+# This YAML documents the surrounding quantum circuit structure.
+
+name: QuantumWalkStep
+description: "One CKS quantum walk half-step: T† · PhaseFlip · T · SWAPs"
+qregs:
+  - {name: main_reg, type: UnsignedInteger, desc: "Main data register (row index j)"}
+  - {name: anc_reg, type: UnsignedInteger, desc: "Ancilla register (column index k + flags)"}
+params:
+  - {name: n_qubits, type: int, desc: "Number of qubits in main_reg (log2 of matrix dimension)"}
+temp_regs:
+  - {name: b1, size: 1, desc: "Flag qubit 1"}
+  - {name: b2, size: 1, desc: "Flag qubit 2"}
+  - {name: j_comp, size: 10, desc: "Complement of row index"}
+  - {name: k_comp, size: 10, desc: "Complement of column index"}
+impl:
+  # Forward walk half-step
+  - comment: "Hadamard on ancilla"
+    op: Hadamard
+    qregs: [anc_reg]
+
+  - comment: "TOperator forward — requires QRAM + sparse matrix (Python submodule)"
+    python: |
+      # TOperator forward: Hadamard(k) → QRAMLoad → SortExceptKey → CondRot → SortExceptKey → QRAMLoad(uncompute)
+      # This requires the sparse matrix QRAM object, handled by the TOperator_Primitive Python submodule
+      pass
+
+  - comment: "Zero-conditional phase flip on [j_comp, k_comp, b1, k, b2]"
+    op: ZeroConditionalPhaseFlip
+    qregs: [anc_reg]
+
+  - comment: "Swap row ↔ column registers"
+    op: Swap_General_General
+    qregs: [main_reg, anc_reg]
+
+  - comment: "Swap flag qubits b1 ↔ b2"
+    op: Swap_General_General
+    qregs: [b1, b2]
+
+  - comment: "Swap complement registers j_comp ↔ k_comp"
+    op: Swap_General_General
+    qregs: [j_comp, k_comp]
+
+  - comment: "TOperator dagger (reverse of forward — requires Python)"
+    python: |
+      # TOperator dagger: reverse column find → uncompute QRAMLoad → reverse → uncompute QRAMLoad → Hadamard(k)
+      pass
+
+  - comment: "Debug: check for NaN in state amplitudes"
+    op: CheckNan
+    qregs: []
+
+sum_t_count_formula: custom

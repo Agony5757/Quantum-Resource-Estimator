@@ -9,6 +9,7 @@ from .QuantumPhaseEstimation import QuantumPhaseEstimation
 from .QDALinearSolver import QDALinearSolver
 from .QuantumBinarySearch import QuantumBinarySearch
 from .QuantumWalkSearch import QuantumWalkSearch
+from .QuantumWalkStep import QuantumWalkStep
 from .ShorFactor import ShorFactor
 from .SimpleStatePrep import SimpleStatePrep
 
@@ -22,6 +23,7 @@ __all__ = [
     "QDALinearSolver",
     "QuantumBinarySearch",
     "QuantumWalkSearch",
+    "QuantumWalkStep",
     "ShorFactor",
     "SimpleStatePrep",
 ]

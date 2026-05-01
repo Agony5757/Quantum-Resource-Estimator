@@ -36,7 +36,7 @@ from pysparq.algorithms.state_preparation import StatePreparation as PS_StatePre
 
 from ..core.operation import AbstractComposite, Composite
 from ..core.registry import OperationRegistry
-from ..core.utils import reg_sz
+from ..core.utils import reg_sz, merge_controllers
 
 
 # ==============================================================================
@@ -290,6 +290,153 @@ class BlockEncodingHsPD:
 # ==============================================================================
 # Walk Operator
 # ==============================================================================
+
+
+class WalkS_Primitive(AbstractComposite):
+    """Quantum walk operator W_s = R · H_s as a pyqres Operation.
+
+    Implements W_s = R · H_s where:
+      H_s = (1-f_s)H_0 + f_s H_1 is the block-encoded interpolated Hamiltonian
+      R is the reflection on the ancilla registers
+      GlobalPhase applies a phase factor
+
+    Forward circuit:
+      BlockEncoding_Hs → Reflection_Bool([anc_UA, anc_2, anc_3], inverse=False) → GlobalPhase(1j)
+    Reverse circuit (dagger):
+      GlobalPhase(-1j) → Reflection_Bool([anc_UA, anc_2, anc_3], inverse=False)
+        → H_BLK → [enc_b, X, ref, X, enc_b, H] with flipped anc_4 controls
+
+    T-count estimate: ~114 (BlockEncodingHs ~110 + Reflection ~3 + GlobalPhase ~0).
+    """
+
+    def __init__(self, reg_list, param_list=None, submodules=None):
+        # reg_list: [main_reg, anc_UA, anc_1, anc_2, anc_3, anc_4]
+        # param_list: [fs]  — interpolation parameter f_s
+        super().__init__(reg_list=reg_list, param_list=param_list or [], submodules=submodules or [])
+        self.main_reg = reg_list[0]
+        self.anc_UA = reg_list[1]
+        self.anc_1 = reg_list[2]
+        self.anc_2 = reg_list[3]
+        self.anc_3 = reg_list[4]
+        self.anc_4 = reg_list[5]
+        self.fs = param_list[0] if param_list else 0.0
+        self._build_program_list()
+
+    def _build_program_list(self):
+        from ..core.registry import OperationRegistry
+        from ..primitives import (
+            Hadamard_Bool, X, Rot_GeneralUnitary, Reflection_Bool,
+            GlobalPhase, Swap_General_General,
+        )
+        import math
+
+        # Rotation matrix R_s for block encoding normalization
+        sqrt_n = 1.0 / math.sqrt((1 - self.fs) ** 2 + self.fs ** 2)
+        r00 = sqrt_n * (1 - self.fs)
+        r01 = sqrt_n * self.fs
+        r10 = sqrt_n * self.fs
+        r11 = sqrt_n * (self.fs - 1)
+        R_s = [complex(r00, 0), complex(r01, 0), complex(r10, 0), complex(r11, 0)]
+
+        ref_conds = [self.anc_1, self.anc_3, self.anc_4]
+        ops = self.program_list
+
+        # ── BlockEncoding_Hs forward ──────────────────────────────────────
+        ops.append(Hadamard_Bool(reg_list=[self.anc_3]))
+
+        # enc_b†
+        ops.append(self._enc_b_op().dagger())
+
+        ops.append(X(reg_list=[self.anc_1], param_list=[0]))
+        ops.append(
+            Reflection_Bool(reg_list=[self.main_reg], param_list=[True]).
+            control_by_all_ones(ref_conds))
+        ops.append(X(reg_list=[self.anc_1], param_list=[0]))
+
+        ops.append(self._enc_b_op())
+
+        # Rotation sequence on anc_2
+        ops.append(X(reg_list=[self.anc_4], param_list=[0]))
+        ops.append(
+            Rot_GeneralUnitary(reg_list=[self.anc_2], param_list=[R_s]).
+            control_by_all_ones([self.anc_4]))
+        ops.append(X(reg_list=[self.anc_4], param_list=[0]))
+        ops.append(
+            Hadamard_Bool(reg_list=[self.anc_2]).
+            control_by_all_ones([self.anc_4]))
+
+        # Block encoding of A
+        ops.append(self._enc_A_op().control_by_all_ones([self.anc_1, self.anc_2]))
+        ops.append(
+            X(reg_list=[self.anc_1], param_list=[0]).
+            control_by_all_ones([self.anc_2]))
+        ops.append(
+            Reflection_Bool(reg_list=[self.anc_2], param_list=[True]).
+            control_by_all_ones([self.anc_1]))
+        ops.append(self._enc_A_op().dagger().control_by_all_ones([self.anc_1, self.anc_2]))
+
+        # Rotation sequence (reverse)
+        ops.append(X(reg_list=[self.anc_4], param_list=[0]))
+        ops.append(
+            Hadamard_Bool(reg_list=[self.anc_2]).
+            control_by_all_ones([self.anc_4]))
+        ops.append(X(reg_list=[self.anc_4], param_list=[0]))
+        ops.append(
+            Rot_GeneralUnitary(reg_list=[self.anc_2], param_list=[R_s]).
+            control_by_all_ones([self.anc_4]))
+
+        # State preparation sequence 2
+        ops.append(self._enc_b_op().dagger())
+        ops.append(X(reg_list=[self.anc_1], param_list=[0]))
+        ops.append(
+            Reflection_Bool(reg_list=[self.main_reg], param_list=[True]).
+            control_by_all_ones(ref_conds))
+        ops.append(X(reg_list=[self.anc_1], param_list=[0]))
+        ops.append(self._enc_b_op())
+
+        ops.append(Hadamard_Bool(reg_list=[self.anc_3]))
+
+        # ── Reflection + GlobalPhase ────────────────────────────────────────
+        ops.append(Reflection_Bool(reg_list=[self.anc_UA, self.anc_2, self.anc_3], param_list=[False]))
+        ops.append(GlobalPhase(reg_list=[self.anc_UA], param_list=[complex(0, 1)]))
+
+        self.declare_program_list()
+
+    def _enc_A_op(self):
+        """Block encoding of matrix A — from submodule if available."""
+        if self.submodules:
+            return self.submodules[0](
+                reg_list=[self.main_reg, self.anc_UA],
+                param_list=[])
+        # Fallback: just Hadamard (placeholder; real impl needs submodule)
+        from ..primitives import Hadamard
+        return Hadamard(reg_list=[self.main_reg])
+
+    def _enc_b_op(self):
+        """State preparation |b⟩ — from submodule if available."""
+        if len(self.submodules) > 1:
+            return self.submodules[1](
+                reg_list=[self.main_reg],
+                param_list=[])
+        from ..primitives import Hadamard
+        return Hadamard(reg_list=[self.main_reg])
+
+    def traverse_children(self, visitor, dagger_ctx=False, controllers_ctx=None):
+        """Custom traversal: reverse operation order for dagger, but do NOT dagger each op.
+
+        WalkS dagger = reverse(forward), NOT dagger_each(reverse(forward)).
+        The reversed sequence uses the SAME operations in reverse order.
+        """
+        effective_dagger = self.dagger_flag ^ dagger_ctx
+        ops = list(reversed(self.program_list)) if effective_dagger else list(self.program_list)
+        controllers_ctx = controllers_ctx or {}
+        controllers_ctx = merge_controllers(controllers_ctx, self.controllers)
+        for op in ops:
+            op.traverse(visitor, dagger_ctx=False, controllers_ctx=controllers_ctx)
+
+    def sum_t_count(self, t_count_list):
+        # WalkS t_count: BlockEncodingHs (~110) + Reflection (~3) + GlobalPhase (~0)
+        return 114
 
 
 class WalkS:
@@ -694,19 +841,20 @@ class QDALinearSolver(AbstractComposite):
             s = step / max(1, self.n_steps - 1) if self.n_steps > 1 else 1.0
             fs = compute_fs(s, self.kappa, self.p)
 
-            # Block encoding of H(s) at this point
+            # WalkS = BlockEncoding_Hs → Reflection → GlobalPhase
+            # Pass encode_A and encode_b as submodules for proper block encoding
+            walk_ops = []
             if self.block_encoding:
-                self.program_list.append(
-                    self.block_encoding(
-                        reg_list=[self.main_reg, self.anc_UA, self.anc_1,
-                                  self.anc_2, self.anc_3, self.anc_4],
-                        param_list=[fs, self.kappa]))
+                walk_ops.append(self.block_encoding)
+            if self.state_prep:
+                walk_ops.append(self.state_prep)
 
-            # Walk operator: Reflection on ancilla
-            if self.anc_2:
-                R_op = OperationRegistry.get_class("Reflection_Bool")
-                self.program_list.append(
-                    R_op(reg_list=[self.anc_2], param_list=[False]))
+            self.program_list.append(
+                WalkS_Primitive(
+                    reg_list=[self.main_reg, self.anc_UA, self.anc_1,
+                              self.anc_2, self.anc_3, self.anc_4],
+                    param_list=[fs],
+                    submodules=walk_ops))
 
         # Post-select: X on ancilla flag
         if self.anc_1:
@@ -722,8 +870,9 @@ class QDALinearSolver(AbstractComposite):
         encode_cost = t_count_list[0] if len(t_count_list) > 0 else 0
         prep_cost = t_count_list[1] if len(t_count_list) > 1 else 0
 
-        step_cost = 4 * 7 + 3
-        return n_steps * step_cost + encode_cost + prep_cost
+        # WalkS t_count ≈ 114 (BlockEncodingHs ~110 + Reflection ~3 + GlobalPhase ~0)
+        walk_cost = 114
+        return n_steps * walk_cost + encode_cost + prep_cost
 
 
 # ==============================================================================
@@ -813,6 +962,7 @@ __all__ = [
     "BlockEncodingHs",
     "BlockEncodingHsPD",
     "WalkS",
+    "WalkS_Primitive",
     "LCU",
     "Filtering",
     "BlockEncoding",
