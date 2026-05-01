@@ -7,10 +7,10 @@ import math
 
 class ShorFactor(AbstractComposite):
     """Shor factorization stub — see notes: ExpMod/ModMul require Python (not DSL-expressible)"""
-    def __init__(self, reg_list, param_list=None, temp_reg_list=[('measure_flag', 1)]):
+    def __init__(self, reg_list, param_list=None, temp_reg_list=[('measure_flag', 1)], operations=None):
         if param_list is None:
             param_list = []
-        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list)
+        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list, operations=operations)
         self.work_reg = reg_list[0]
         self.anc_reg = reg_list[1]
         self.N = param_list[0]

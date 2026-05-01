@@ -8,8 +8,8 @@ import math
 class Swap(StandardComposite):
     __self_conjugate__ = True
     """Swap two registers via 3 CNOTs"""
-    def __init__(self, reg_list):
-        StandardComposite.__init__(self, reg_list=reg_list)
+    def __init__(self, reg_list, operations=None):
+        StandardComposite.__init__(self, reg_list=reg_list, operations=operations)
         self.reg1 = reg_list[0]
         self.reg2 = reg_list[1]
         self.program_list = [

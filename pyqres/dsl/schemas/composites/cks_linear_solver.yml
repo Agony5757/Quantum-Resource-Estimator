@@ -27,6 +27,8 @@ qregs:
 params:
   - {name: kappa, type: float, desc: "Condition number of matrix A"}
   - {name: epsilon, type: float, desc: "Precision parameter"}
+  - {name: encode_A, type: operation, desc: "Block encoding of A (e.g. BlockEncodingViaQRAM instance)"}
+  - {name: encode_b, type: operation, desc: "State preparation of |b⟩ (e.g. StatePrepViaQRAM instance)"}
 temp_regs:
   - {name: b1, size: 1, desc: "Flag qubit for state preparation"}
   - {name: b2, size: 1, desc: "Flag qubit for block encoding"}
@@ -37,49 +39,36 @@ computed_params:
     formula: "int(math.sqrt((cheb_b) * (math.log(4 * cheb_b) - math.log(epsilon))))"
 impl:
   # ── 1. Block encoding of A ──────────────────────────────────────────────
-  # Uses BlockEncodingViaQRAM (submodule) which requires QRAM setup.
-  # The actual block encoding op is added via Python at construction time
-  # (self.encode_A submodule, registered separately).
-  - comment: "Block encoding of A — via encode_A submodule (QRAM setup in Python)"
+  - comment: "Block encoding of A — via encode_A (operation param)"
     python: |
-      # Python: self.encode_A is passed as a submodule
-      # Program list entry created at construction time in _build_program_list
-      pass
+      if self.encode_A:
+          self.program_list.append(self.encode_A)
 
   # ── 2. State preparation |b⟩ ─────────────────────────────────────────────
-  - comment: "State preparation of |b⟩ — via encode_b submodule"
+  - comment: "State preparation of |b⟩ — via encode_b (operation param)"
     python: |
-      # Python: self.encode_b is passed as a submodule
-      pass
+      if self.encode_b:
+          self.program_list.append(self.encode_b)
 
   # ── 3. Chebyshev iteration loop ─────────────────────────────────────────
-  # For each j = 0..j0:
-  #   H on ancilla
-  #   (2j+1) × QuantumWalkStep
-  #
-  # cheb.step(j) = 2j + 1 gives the number of walk steps per iteration.
-  # The Chebyshev coefficients weight the walk to approximate A⁻¹|b⟩.
-  - comment: "Chebyshev-filtered quantum walk iterations"
-    loop:
-      iterations: j0
-      body:
-        - comment: "Hadamard on ancilla register to create superposition"
-          op: Hadamard
-          qregs: [anc_reg]
-
-        - comment: "Quantum walk steps — count = 2*$j + 1 (cheb.step(j))"
-          loop:
-            iterations: cheb_b
-            body:
-              # One QuantumWalkStep = T† · PhaseFlip · T · SWAPs
-              # See quantum_walk_step.yml for the full structure.
-              # The TOperator (QRAM load + conditional rotation) is a Python submodule.
-              - comment: "Zero-conditional phase flip"
-                op: ZeroConditionalPhaseFlip
-                qregs: [anc_reg]
-
-              - comment: "SWAP row ↔ column indices"
-                op: Swap_General_General
-                qregs: [main_reg, anc_reg]
+  - comment: "Chebyshev iteration: for j in range(j0+1)"
+    python: |
+      from ..algorithms.cks_solver import ChebyshevPolynomialCoefficient
+      cheb = ChebyshevPolynomialCoefficient(b=int(self.cheb_b))
+      for j in range(self.j0 + 1):
+          self.program_list.append(
+              OperationRegistry.get_class("Hadamard")(
+                  reg_list=[self.anc_reg], param_list=[]))
+          for _ in range(cheb.step(j)):
+              self.program_list.append(
+                  OperationRegistry.get_class("ZeroConditionalPhaseFlip")(
+                      reg_list=[self.anc_reg], param_list=[]))
+              if self.encode_A:
+                  self.program_list.append(self.encode_A)
+              self.program_list.append(
+                  OperationRegistry.get_class("Swap_General_General")(
+                      reg_list=[self.main_reg, self.anc_reg], param_list=[]))
+              if self.encode_A:
+                  self.program_list.append(self.encode_A.dagger())
 
 sum_t_count_formula: custom

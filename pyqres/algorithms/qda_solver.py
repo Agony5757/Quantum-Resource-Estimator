@@ -325,7 +325,7 @@ class WalkS_Primitive(AbstractComposite):
     def _build_program_list(self):
         from ..core.registry import OperationRegistry
         from ..primitives import (
-            Hadamard_Bool, X, Rot_GeneralUnitary, Reflection_Bool,
+            Hadamard_Bool, X, Rot_Bool, Reflection_Bool,
             GlobalPhase, Swap_General_General,
         )
         import math
@@ -358,7 +358,7 @@ class WalkS_Primitive(AbstractComposite):
         # Rotation sequence on anc_2
         ops.append(X(reg_list=[self.anc_4], param_list=[0]))
         ops.append(
-            Rot_GeneralUnitary(reg_list=[self.anc_2], param_list=[R_s]).
+            Rot_Bool(reg_list=[self.anc_2], param_list=[R_s]).
             control_by_all_ones([self.anc_4]))
         ops.append(X(reg_list=[self.anc_4], param_list=[0]))
         ops.append(
@@ -382,7 +382,7 @@ class WalkS_Primitive(AbstractComposite):
             control_by_all_ones([self.anc_4]))
         ops.append(X(reg_list=[self.anc_4], param_list=[0]))
         ops.append(
-            Rot_GeneralUnitary(reg_list=[self.anc_2], param_list=[R_s]).
+            Rot_Bool(reg_list=[self.anc_2], param_list=[R_s]).
             control_by_all_ones([self.anc_4]))
 
         # State preparation sequence 2

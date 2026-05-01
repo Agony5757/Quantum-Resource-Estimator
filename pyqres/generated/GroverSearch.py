@@ -7,10 +7,10 @@ import math
 
 class GroverSearch(AbstractComposite):
     """Grover search: Oracle (Compare+ZeroConditionalPhaseFlip) + Diffusion operator"""
-    def __init__(self, reg_list, param_list=None, temp_reg_list=[('less_flag', 1), ('equal_flag', 1)]):
+    def __init__(self, reg_list, param_list=None, temp_reg_list=[('less_flag', 1), ('equal_flag', 1)], operations=None):
         if param_list is None:
             param_list = []
-        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list)
+        AbstractComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list, operations=operations)
         self.search_reg = reg_list[0]
         self.target_reg = reg_list[1]
         self.n_qubits = param_list[0]

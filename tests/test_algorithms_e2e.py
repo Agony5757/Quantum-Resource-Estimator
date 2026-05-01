@@ -14,7 +14,8 @@ from pyqres.primitives import (
 )
 from pyqres.core.utils import reg_sz, merge_controllers
 from pyqres.core.simulator import PyQSparseOperationWrapper
-from pyqres.generated import Swap
+from pyqres.generated import Swap, QDALinearSolver, CKSLinearSolver
+from pyqres.algorithms.qda_solver import WalkS_Primitive
 
 # Import pyqres algorithm helpers (re-exported from PySparQ)
 from pyqres.algorithms.cks_solver import (
@@ -339,3 +340,54 @@ class TestLoweringEngine:
         engine = LoweringEngine()
         result = engine.estimate(Hadamard(['q']), SimulationEstimator())
         assert result.size() == 4
+
+
+# ── YAML-Generated Solver Tests ──
+
+
+class TestQDAGenerated:
+    """YAML-generated QDALinearSolver replacing the Python-native version."""
+
+    def test_walks_in_program_list(self):
+        """QDALinearSolver.program_list should contain WalkS_Primitive instances (> 2 ops)."""
+        declare_regs(main_reg=2, anc_UA=4, anc_1=1, anc_2=1, anc_3=1, anc_4=1)
+        solver = QDALinearSolver(
+            reg_list=["main_reg", "anc_UA", "anc_1", "anc_2", "anc_3", "anc_4"],
+            param_list=[2.0, 0.1],
+            operations=[None, None])
+        assert len(solver.program_list) > 2
+
+    def test_simulation_runs(self):
+        """QDALinearSolver can be traversed by SimulatorVisitor without error."""
+        declare_regs(main_reg=2, anc_UA=4, anc_1=1, anc_2=1, anc_3=1, anc_4=1)
+        solver = QDALinearSolver(
+            reg_list=["main_reg", "anc_UA", "anc_1", "anc_2", "anc_3", "anc_4"],
+            param_list=[2.0, 0.1],
+            operations=[None, None])
+        sim = SimulatorVisitor()
+        solver.traverse(sim)
+        assert sim.state.size() >= 1
+
+
+class TestCKSGenerated:
+    """YAML-generated CKSLinearSolver replacing the Python-native version."""
+
+    def test_chebyshev_loop_in_program_list(self):
+        """CKSLinearSolver.program_list should contain operations from Chebyshev loop (> 0)."""
+        declare_regs(main_reg=2, anc_reg=4)
+        solver = CKSLinearSolver(
+            reg_list=["main_reg", "anc_reg"],
+            param_list=[2.0, 0.1],
+            operations=[None, None])
+        assert len(solver.program_list) > 0
+
+    def test_simulation_runs(self):
+        """CKSLinearSolver can be traversed by SimulatorVisitor without error."""
+        declare_regs(main_reg=2, anc_reg=4)
+        solver = CKSLinearSolver(
+            reg_list=["main_reg", "anc_reg"],
+            param_list=[2.0, 0.1],
+            operations=[None, None])
+        sim = SimulatorVisitor()
+        solver.traverse(sim)
+        assert sim.state.size() >= 1

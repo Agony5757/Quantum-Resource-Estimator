@@ -7,10 +7,10 @@ import math
 
 class SimpleStatePrep(StandardComposite):
     """Simple state preparation for uniform superposition"""
-    def __init__(self, reg_list, param_list=None):
+    def __init__(self, reg_list, param_list=None, operations=None):
         if param_list is None:
             param_list = []
-        StandardComposite.__init__(self, reg_list=reg_list, param_list=param_list)
+        StandardComposite.__init__(self, reg_list=reg_list, param_list=param_list, operations=operations)
         self.reg = reg_list[0]
         self.n_qubits = param_list[0]
         # Complex implementation with loops/conditionals

@@ -7,10 +7,10 @@ import math
 
 class BlockEncodingViaQRAM(StandardComposite):
     """Block encoding via QRAM: U_A = SWAP · UR† · UL (interface definition)"""
-    def __init__(self, reg_list, param_list=None):
+    def __init__(self, reg_list, param_list=None, operations=None):
         if param_list is None:
             param_list = []
-        StandardComposite.__init__(self, reg_list=reg_list, param_list=param_list)
+        StandardComposite.__init__(self, reg_list=reg_list, param_list=param_list, operations=operations)
         self.row_index = reg_list[0]
         self.column_index = reg_list[1]
         self.data_size = param_list[0]

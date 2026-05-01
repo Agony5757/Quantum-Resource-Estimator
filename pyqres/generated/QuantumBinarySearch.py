@@ -7,10 +7,10 @@ import math
 
 class QuantumBinarySearch(StandardComposite):
     """Quantum binary search using QRAM for database lookup"""
-    def __init__(self, reg_list, param_list=None, temp_reg_list=[('flag', 1), ('left_register', 10), ('right_register', 10), ('mid_register', 10), ('midval_register', 10), ('compare_less', 1), ('compare_equal', 1)]):
+    def __init__(self, reg_list, param_list=None, temp_reg_list=[('flag', 1), ('left_register', 10), ('right_register', 10), ('mid_register', 10), ('midval_register', 10), ('compare_less', 1), ('compare_equal', 1)], operations=None):
         if param_list is None:
             param_list = []
-        StandardComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list)
+        StandardComposite.__init__(self, reg_list=reg_list, param_list=param_list, temp_reg_list=temp_reg_list, operations=operations)
         self.address_offset = reg_list[0]
         self.target = reg_list[1]
         self.result = reg_list[2]

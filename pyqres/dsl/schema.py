@@ -44,6 +44,7 @@ class SchemaValidator:
         "op_instance",  # Operation instance: {"type": "op_instance", "name": "GroverOracle"}
         "qram",         # QRAM circuit object: {"type": "qram", "addr_size": int, "data_size": int, "memory": list}
         "qram_ref",     # Reference to a declared QRAM param: {"type": "qram_ref", "name": "qram"}
+        "operation",     # Operation instance passed as constructor argument: {"type": "operation"}
     }
 
     def __init__(self):

@@ -50,12 +50,18 @@ qregs:
 params:
   - {name: kappa, type: float, desc: "Condition number of matrix A"}
   - {name: epsilon, type: float, desc: "Precision parameter"}
+  - {name: encode_A, type: operation, desc: "Block encoding of A (e.g. BlockEncodingViaQRAM instance)"}
+  - {name: encode_b, type: operation, desc: "State preparation of |b⟩ (e.g. StatePrepViaQRAM instance)"}
 computed_params:
   - name: p
     formula: "0.5"
   - name: n_steps
     formula: "int(math.ceil(math.log(kappa / epsilon)))"
 impl:
+  # ── 0. Module-level imports for python: blocks ───────────────────────────
+  - python: |
+      from ..algorithms.qda_solver import compute_fs, WalkS_Primitive
+
   # ── 1. Initialize to H₀ eigenstate: X|0⟩ ───────────────────────────────
   - comment: "X on first qubit of main_reg to prepare H₀ eigenstate |1⟩"
     op: X
@@ -63,12 +69,11 @@ impl:
     params: [0]
 
   # ── 2. State preparation of |b⟩ ─────────────────────────────────────────
-  # Uses StatePreparation submodule (requires QRAM/b-normalized vector, Python)
-  - comment: "State preparation |0⟩ → |b⟩ — via state_prep submodule"
+  - comment: "State preparation |0⟩ → |b⟩ — via encode_b (operation param)"
     python: |
-      # Python: self.state_prep is passed as a submodule
-      # Encodes the right-hand side vector b into amplitudes
-      pass
+      if self.encode_b:
+          self.program_list.append(
+              self.encode_b(reg_list=[self.main_reg], param_list=[self.epsilon]))
 
   # ── 3. Discrete adiabatic evolution loop ────────────────────────────────
   # Evolves from H₀ = σ_z ⊗ |0⟩⟨0| to H₁ = A ⊗ |b⟩⟨b| in n_steps.
@@ -77,26 +82,19 @@ impl:
       iterations: n_steps
       body:
         - comment: "WalkS = BlockEncoding_Hs(f_s) → Reflection → GlobalPhase"
-          comment: "  WalkS forward circuit (see docstring for full gate sequence)"
           python: |
-            # WalkS_Primitive is built in Python (qda_solver.py):
-            # fs = compute_fs(s, kappa, p)
-            # R_s = 1/sqrt((1-fs)²+fs²) * [[1-fs, fs], [fs, fs-1]]
-            # BlockEncoding_Hs: H(anc_3), enc_b†, X(anc_1), Ref, X(anc_1), enc_b,
-            #                   X(anc_4), Rot(anc_2,R_s|anc_4), X(anc_4), H(anc_2|anc_4),
-            #                   enc_A(anc_1,anc_2), X(anc_1|anc_2), Ref(anc_2|anc_1), enc_A†,
-            #                   X(anc_4), H(anc_2|anc_4), X(anc_4), Rot(anc_2,R_s|anc_4),
-            #                   enc_b†, X(anc_1), Ref, X(anc_1), enc_b, H(anc_3)
-            # Reflection: Reflection_Bool([anc_UA, anc_2, anc_3], inverse=False)
-            # GlobalPhase: complex(0, 1)
-            pass
+            s = i / max(1, self.n_steps - 1) if self.n_steps > 1 else 1.0
+            fs = compute_fs(s, self.kappa, self.p)
+            walk_ops = [op for op in [self.encode_A, self.encode_b] if op]
+            self.program_list.append(
+                WalkS_Primitive(
+                    reg_list=[self.main_reg, self.anc_UA, self.anc_1,
+                              self.anc_2, self.anc_3, self.anc_4],
+                    param_list=[fs],
+                    submodules=walk_ops))
 
         - comment: "WalkS dagger: reverse sequence with negated global phase"
           python: |
-            # WalkS dagger = reverse(forward) with:
-            #   GlobalPhase(-1j)
-            #   Reflection_Bool([anc_UA, anc_2, anc_3], inverse=False)
-            #   [BlockEncoding_Hs reverse with anc_4 condition flipped via X gates]
             pass
 
   # ── 4. Post-selection: X on ancilla flag ───────────────────────────────
